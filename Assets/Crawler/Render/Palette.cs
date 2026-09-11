@@ -22,6 +22,12 @@ namespace Crawler.Render
         public static readonly Color MossDeep  = Hex(0x535C3E);
         public static readonly Color Grout     = Hex(0x444C35);
         public static readonly Color Pit       = Hex(0x2A2620);
+        public static readonly Color Forest    = Hex(0x363E2C); // forest floor outside rooms
+        public static readonly Color Forest2   = Hex(0x3E4732);
+        public static readonly Color WallBed   = Hex(0x4A463A);
+        public static readonly Color Needle    = Hex(0x3F4A2F); // darker pine
+        public static readonly Color Burnt     = Hex(0xC4652F); // poster sunset band
+        public static readonly Color Ridge     = Hex(0x9B6B4A); // far mountains
 
         public static Color Hex(int rgb) =>
             new Color(((rgb >> 16) & 0xFF) / 255f, ((rgb >> 8) & 0xFF) / 255f, (rgb & 0xFF) / 255f, 1f);

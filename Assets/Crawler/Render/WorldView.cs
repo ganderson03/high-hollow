@@ -34,6 +34,9 @@ namespace Crawler.Render
         }
 
         public uint LastTick { get; private set; }
+
+        /// <summary>Local player's authoritative cell from the latest snapshot (perception use only).</summary>
+        public Vector2Int? LocalCell { get; private set; }
         public bool HasSnapshot { get; private set; }
 
         /// <summary>Visible (post-overlay) entity and phantom cells, for camera framing.</summary>
@@ -68,6 +71,7 @@ namespace Crawler.Render
         {
             // Authoritative layer: one view per entity id.
             Grow(_views, _entities.Length, entityRoot);
+            LocalCell = null;
             int playerOrdinal = 0;
             for (int id = 0; id < _views.Count; id++)
             {
@@ -79,7 +83,10 @@ namespace Crawler.Render
                 bool visible = !_hidden.Contains(id);
                 int look = _substituted.TryGetValue(id, out var sub) ? sub : Looks.ForKind(s.Kind);
                 v.Bind(id, s, look, visible);
-                v.SetLocal(s.Kind == EntityKind.Player && playerOrdinal == _localClient);
+                bool isLocal = s.Kind == EntityKind.Player && playerOrdinal == _localClient;
+                v.SetLocal(isLocal);
+                v.SetAccent(s.Kind == EntityKind.Player ? ScarfFor(playerOrdinal) : (Color?)null);
+                if (isLocal) LocalCell = new Vector2Int(s.X, s.Y);
                 if (s.Kind == EntityKind.Player) playerOrdinal++;
             }
 
@@ -92,8 +99,13 @@ namespace Crawler.Render
                 var p = ph[i];
                 _phantoms[i].Bind(-1, new EntityState(p.X, p.Y, EntityKind.Player, 0, -1), p.Look, true);
                 _phantoms[i].SetLocal(false);
+                _phantoms[i].SetAccent(null);
             }
         }
+
+        static readonly Color[] Scarves = { Palette.Sienna, Palette.Pine, Palette.Ochre };
+
+        static Color ScarfFor(int playerOrdinal) => Scarves[playerOrdinal % Scarves.Length];
 
         static void Grow(List<EntityView> list, int n, Transform parent)
         {

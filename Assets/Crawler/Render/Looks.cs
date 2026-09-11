@@ -4,7 +4,7 @@ using UnityEngine;
 namespace Crawler.Render
 {
     /// <summary>How a look responds to the entity's authoritative state byte. Purely cosmetic.</summary>
-    public enum LookAnim { None, Sink, Tilt, Press, Bob, Pulse }
+    public enum LookAnim { None, Sink, Tilt, Press, Bob, Pulse, Critter }
 
     /// <summary>
     /// A "look" is the appearance key. Keys 0..7 are the kind looks; the overlay's
@@ -22,6 +22,7 @@ namespace Crawler.Render
         {
             switch ((EntityKind)look)
             {
+                case EntityKind.Player: return LookAnim.Critter;
                 case EntityKind.Door: return LookAnim.Sink;
                 case EntityKind.Lever: return LookAnim.Tilt;
                 case EntityKind.Plate: return LookAnim.Press;
@@ -33,7 +34,7 @@ namespace Crawler.Render
             }
         }
 
-        public static GameObject Build(int look, Transform parent)
+        public static GameObject Build(int look, Transform parent, Color? accent = null)
         {
             var root = new GameObject("Look_" + LookName(look));
             root.transform.SetParent(parent, false);
@@ -44,14 +45,7 @@ namespace Crawler.Render
             switch (look)
             {
                 case (int)EntityKind.Player:
-                    Part(anim, PrimitiveType.Capsule, ProcArt.Textured(ProcArt.Rosettes, Color.white),
-                         new Vector3(0, 0.45f, 0), new Vector3(0.55f, 0.45f, 0.55f));
-                    // Ears: two small spheres; reads as a round-headed cat at poster scale.
-                    Part(anim, PrimitiveType.Sphere, ProcArt.Solid(Palette.Cream), new Vector3(-0.15f, 0.9f, 0), Vector3.one * 0.14f);
-                    Part(anim, PrimitiveType.Sphere, ProcArt.Solid(Palette.Cream), new Vector3(0.15f, 0.9f, 0), Vector3.one * 0.14f);
-                    // Long tail curled on the ground.
-                    Part(anim, PrimitiveType.Capsule, ProcArt.Textured(ProcArt.Rosettes, Color.white),
-                         new Vector3(0, 0.08f, -0.3f), new Vector3(0.14f, 0.28f, 0.14f), Quaternion.Euler(90, 20, 0));
+                    BuildSnowLeopard(anim, accent);
                     break;
 
                 case (int)EntityKind.Door:
@@ -104,12 +98,79 @@ namespace Crawler.Render
             return root;
         }
 
+        /// <summary>
+        /// Stylized snow leopard, facing local +Z: low rosette body, round head with a cream
+        /// muzzle, four stubby legs, and the long thick tail curling up behind. The "Tail"
+        /// pivot is swayed by EntityView; the optional accent is a scarf (per-player color).
+        /// </summary>
+        static void BuildSnowLeopard(Transform anim, Color? accent)
+        {
+            var fur = ProcArt.Fur;
+            var cream = ProcArt.Solid(Palette.Cream);
+            var dark = ProcArt.Solid(Palette.Rosette);
+
+            // Body and chest: low-slung.
+            Part(anim, PrimitiveType.Capsule, fur, new Vector3(0, 0.31f, -0.02f), new Vector3(0.34f, 0.29f, 0.34f), Quaternion.Euler(90, 0, 0));
+            Part(anim, PrimitiveType.Sphere, fur, new Vector3(0, 0.34f, 0.19f), new Vector3(0.36f, 0.34f, 0.34f));
+            Part(anim, PrimitiveType.Sphere, cream, new Vector3(0, 0.26f, 0.22f), new Vector3(0.26f, 0.2f, 0.22f)); // pale belly/chest
+
+            // Legs: short and stout, big soft paws.
+            foreach (var (lx, lz) in new[] { (-0.1f, 0.18f), (0.1f, 0.18f), (-0.1f, -0.2f), (0.1f, -0.2f) })
+            {
+                Part(anim, PrimitiveType.Capsule, fur, new Vector3(lx, 0.1f, lz), new Vector3(0.11f, 0.1f, 0.11f));
+                Part(anim, PrimitiveType.Sphere, cream, new Vector3(lx, 0.035f, lz + 0.025f), new Vector3(0.12f, 0.065f, 0.14f)); // paws
+            }
+
+            // Head.
+            var head = new GameObject("Head").transform;
+            head.SetParent(anim, false);
+            head.localPosition = new Vector3(0, 0.52f, 0.36f);
+            Part(head, PrimitiveType.Sphere, fur, Vector3.zero, new Vector3(0.3f, 0.27f, 0.28f));
+            Part(head, PrimitiveType.Sphere, cream, new Vector3(0, -0.05f, 0.12f), new Vector3(0.17f, 0.12f, 0.12f)); // muzzle
+            Part(head, PrimitiveType.Sphere, ProcArt.Solid(Palette.Umber), new Vector3(0, -0.02f, 0.18f), new Vector3(0.05f, 0.035f, 0.035f)); // nose
+            Part(head, PrimitiveType.Sphere, ProcArt.Solid(Palette.Night), new Vector3(-0.07f, 0.03f, 0.125f), new Vector3(0.04f, 0.045f, 0.03f));
+            Part(head, PrimitiveType.Sphere, ProcArt.Solid(Palette.Night), new Vector3(0.07f, 0.03f, 0.125f), new Vector3(0.04f, 0.045f, 0.03f));
+            // Ears: small, rounded, set wide and low (snow leopard, not bear): cream with a dark rim.
+            foreach (float ex in new[] { -0.105f, 0.105f })
+            {
+                Part(head, PrimitiveType.Sphere, dark, new Vector3(ex, 0.1f, -0.015f), new Vector3(0.07f, 0.06f, 0.04f));
+                Part(head, PrimitiveType.Sphere, cream, new Vector3(ex, 0.098f, 0.0f), new Vector3(0.05f, 0.042f, 0.03f));
+            }
+
+            // Tail: long and thick, trailing low behind and curling up only at the end.
+            // Overlapping segments (spacing < radius) so it reads as one tail, not beads.
+            var tail = new GameObject("Tail").transform;
+            tail.SetParent(anim, false);
+            tail.localPosition = new Vector3(0, 0.34f, -0.3f);
+            var segs = new[]
+            {
+                (new Vector3(0.00f,  0.00f, -0.04f), 0.155f),
+                (new Vector3(0.01f, -0.03f, -0.12f), 0.15f),
+                (new Vector3(0.03f, -0.05f, -0.20f), 0.145f),
+                (new Vector3(0.06f, -0.05f, -0.28f), 0.14f),
+                (new Vector3(0.10f, -0.02f, -0.34f), 0.135f),
+                (new Vector3(0.15f,  0.04f, -0.37f), 0.13f),
+                (new Vector3(0.19f,  0.12f, -0.36f), 0.125f),
+                (new Vector3(0.22f,  0.20f, -0.32f), 0.12f),
+            };
+            foreach (var (p, r) in segs) Part(tail, PrimitiveType.Sphere, fur, p, Vector3.one * r);
+            Part(tail, PrimitiveType.Sphere, dark, new Vector3(0.23f, 0.27f, -0.27f), Vector3.one * 0.12f); // dark tail tip
+
+            // Scarf: a clear band at the neck, between chest and head, with a short end hanging off one side.
+            if (accent.HasValue)
+            {
+                var scarf = ProcArt.Solid(accent.Value);
+                Part(anim, PrimitiveType.Cylinder, scarf, new Vector3(0, 0.46f, 0.29f), new Vector3(0.36f, 0.045f, 0.34f), Quaternion.Euler(-35, 0, 0));
+                Part(anim, PrimitiveType.Capsule, scarf, new Vector3(0.15f, 0.37f, 0.3f), new Vector3(0.08f, 0.12f, 0.05f), Quaternion.Euler(0, 0, 20));
+            }
+        }
+
         /// <summary>Small pieces are scaled up for legibility; cell-filling pieces stay at 1.</summary>
         static float ScaleFor(int look)
         {
             switch ((EntityKind)look)
             {
-                case EntityKind.Player: return 1.35f;
+                case EntityKind.Player: return 1.15f;
                 case EntityKind.Lever: return 1.35f;
                 case EntityKind.Key: return 1.5f;
                 case EntityKind.Sightstone: return 1.3f;

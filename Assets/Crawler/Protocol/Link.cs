@@ -9,6 +9,8 @@ namespace Crawler.Protocol
         void OnSnapshot(Snapshot msg);
         void OnOverlay(Overlay msg);
         void OnChat(ChatMsg msg);
+        void OnLevel(LevelMsg msg);
+        void OnRound(RoundMsg msg);
         void OnStatus(LinkStatus status, string detail);
     }
 

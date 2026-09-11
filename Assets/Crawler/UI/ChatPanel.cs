@@ -17,6 +17,12 @@ namespace Crawler.UI
 
         public Action<string> OnSubmit;
 
+        /// <summary>When true, Enter does not focus the chat field (e.g. a poster card is up).</summary>
+        public Func<bool> Blocked;
+
+        CanvasGroup _group;
+        float _lastActivity;
+
         readonly Queue<string> _lines = new Queue<string>();
         Text _log;
         ScrollRect _scroll;
@@ -35,14 +41,21 @@ namespace Crawler.UI
             while (_lines.Count > MaxLines) _lines.Dequeue();
             _log.text = string.Join("\n", _lines);
             _scrollPending = true;
+            _lastActivity = Time.unscaledTime;
         }
 
         public void AddSystem(string text) => AddLine("~", text, Palette.Ochre);
 
         void Update()
         {
+            // Fade back when idle so the room stays readable; full strength while talking.
+            if (IsTyping) _lastActivity = Time.unscaledTime;
+            float target = Time.unscaledTime - _lastActivity < 8f ? 1f : 0.4f;
+            _group.alpha = Mathf.MoveTowards(_group.alpha, target, Time.unscaledDeltaTime * 2f);
+
             var kb = Keyboard.current;
             if (kb != null && !_field.isFocused && Time.frameCount != _submitFrame
+                && (Blocked == null || !Blocked())
                 && (kb.enterKey.wasPressedThisFrame || kb.numpadEnterKey.wasPressedThisFrame))
             {
                 _field.ActivateInputField();
@@ -85,6 +98,7 @@ namespace Crawler.UI
             rt.anchoredPosition = new Vector2(16, 16);
             rt.sizeDelta = new Vector2(340, 190);
 
+            _group = gameObject.AddComponent<CanvasGroup>();
             var bg = gameObject.AddComponent<Image>();
             bg.color = WithAlpha(Palette.Night, 0.82f);
             gameObject.AddComponent<Outline>().effectColor = WithAlpha(Palette.Sienna, 0.9f);

@@ -48,6 +48,14 @@ namespace Crawler.Protocol
                         handler.OnChat(new ChatMsg { From = (byte)o["from"], Text = (string)o["text"] ?? "" });
                         return true;
 
+                    case "level":
+                        handler.OnLevel(new LevelMsg { Id = (string)o["id"] });
+                        return true;
+
+                    case "round":
+                        handler.OnRound(new RoundMsg { Tick = (uint)o["tick"], State = RoundFromWire((string)o["state"]) });
+                        return true;
+
                     default:
                         error = "unknown message type: " + (string)o["t"];
                         return false;
@@ -162,7 +170,28 @@ namespace Crawler.Protocol
                 w.WriteEndArray();
             });
 
+        public static string EncodeLevel(string id) =>
+            Write(w => { Field(w, "t", "level"); Field(w, "id", id); });
+
+        public static string EncodeRound(RoundMsg m) =>
+            Write(w =>
+            {
+                Field(w, "t", "round");
+                w.WritePropertyName("tick"); w.WriteValue(m.Tick);
+                Field(w, "state", m.State == RoundState.Won ? "won" : "playing");
+            });
+
         // ---------------------------------------------------------------- helpers
+
+        static RoundState RoundFromWire(string s)
+        {
+            switch (s)
+            {
+                case "playing": return RoundState.Playing;
+                case "won": return RoundState.Won;
+                default: throw new FormatException("unknown round state: " + s);
+            }
+        }
 
         public static string MoveToWire(MoveDir m)
         {

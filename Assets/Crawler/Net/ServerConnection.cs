@@ -157,6 +157,8 @@ namespace Crawler.Net
             public void OnSnapshot(Snapshot m) => _inner.OnSnapshot(m);
             public void OnOverlay(Overlay m) => _inner.OnOverlay(m);
             public void OnChat(ChatMsg m) => _inner.OnChat(m);
+            public void OnLevel(LevelMsg m) => _inner.OnLevel(m);
+            public void OnRound(RoundMsg m) => _inner.OnRound(m);
             public void OnStatus(LinkStatus s, string d) => _inner.OnStatus(s, d);
         }
     }

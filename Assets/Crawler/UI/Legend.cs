@@ -14,7 +14,7 @@ namespace Crawler.UI
             if (rt == null) rt = gameObject.AddComponent<RectTransform>();
             rt.anchorMin = rt.anchorMax = rt.pivot = new Vector2(1, 1);
             rt.anchoredPosition = new Vector2(-16, -16);
-            rt.sizeDelta = new Vector2(230, 196);
+            rt.sizeDelta = new Vector2(250, 228);
             gameObject.AddComponent<Image>().color = new Color(Palette.Night.r, Palette.Night.g, Palette.Night.b, 0.82f);
             gameObject.AddComponent<Outline>().effectColor = Palette.Sienna;
 
@@ -32,10 +32,12 @@ namespace Crawler.UI
                 $"{C(Palette.Ochre, "●")}  you (gold ring)\n" +
                 $"{C(Palette.Cream, "●")}  teammates\n" +
                 $"{C(Palette.Pine, "●")}  lever: stand beside, Space\n" +
-                $"{C(Palette.Umber, "●")}  door\n" +
-                $"{C(Palette.Cream, "◉")}  goal\n" +
+                $"{C(Palette.Stone, "●")}  stone plate: hold to open\n" +
+                $"{C(Palette.Umber, "●")}  door / summit gate\n" +
+                $"{C(Palette.Ochre, "●")}  key: three open the gate\n" +
                 $"{C(Palette.Sienna, "●")}  hazard pit: back to camp\n" +
-                $"{C(Palette.Stone, "●")}  sightstone\n" +
+                $"{C(Palette.Stone, "●")}  sightstone: Space to see true\n" +
+                $"{C(Palette.Cream, "◉")}  summit\n" +
                 $"\n{C(Palette.Sand, "WASD / arrows move · Enter chat")}";
         }
 

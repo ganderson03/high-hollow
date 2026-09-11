@@ -19,7 +19,10 @@ namespace Crawler.Render
         Transform _visual;
         Transform _anim;
         GameObject _lookGo;
-        GameObject _carriedPip;
+        Vector3 _lift;
+        Color? _accent;
+        Transform _tail;
+        float _yaw = 210f; // default: face the camera
         LookAnim _animMode;
         float _animTarget, _anim01;
         Vector3 _glideOffset;
@@ -43,8 +46,15 @@ namespace Crawler.Render
             name = id >= 0 ? $"E{id}_{s.Kind}" : "Phantom";
 
             var cell = GridSpace.CellToWorld(s.X, s.Y);
+            var prev = transform.localPosition;
             if (!rebind && gameObject.activeSelf && visible)
-                _glideOffset += transform.localPosition - cell; // visual catches up; root does not
+            {
+                _glideOffset += prev - cell; // visual catches up; root does not
+                // Face the way we just moved (a derived, visual-only heading).
+                var step = cell - prev;
+                if (step.sqrMagnitude > 0.01f && step.sqrMagnitude < 4f)
+                    _yaw = Mathf.Atan2(step.x, step.z) * Mathf.Rad2Deg;
+            }
             else
                 _glideOffset = Vector3.zero;
             transform.localPosition = cell;
@@ -56,13 +66,25 @@ namespace Crawler.Render
             if (gameObject.activeSelf != visible) gameObject.SetActive(visible);
         }
 
+        /// <summary>Per-player accent (scarf color); null for none. Rebuilds the look if it changes.</summary>
+        public void SetAccent(Color? accent)
+        {
+            if (accent == _accent) return;
+            _accent = accent;
+            if (Look == int.MinValue) return;
+            int look = Look;
+            Look = int.MinValue;
+            SetLook(look);
+        }
+
         void SetLook(int look)
         {
             if (look == Look) return;
             Look = look;
             if (_lookGo != null) Destroy(_lookGo);
-            _lookGo = Looks.Build(look, _visual);
+            _lookGo = Looks.Build(look, _visual, _accent);
             _anim = _lookGo.transform.Find("Anim");
+            _tail = _lookGo.transform.Find("Anim/Tail");
             _animMode = Looks.AnimFor(look);
             _anim01 = _animTarget;
             _glideOffset = Vector3.zero;
@@ -86,25 +108,17 @@ namespace Crawler.Render
             if (_localRing != null) _localRing.SetActive(isLocal);
         }
 
-        void SetCarried(bool carried)
-        {
-            if (carried && _carriedPip == null)
-            {
-                _carriedPip = new GameObject("CarriedPip");
-                _carriedPip.transform.SetParent(_visual, false);
-                _carriedPip.transform.localPosition = new Vector3(0, 1.05f, 0);
-                _carriedPip.transform.localScale = new Vector3(0.16f, 0.04f, 0.16f);
-                _carriedPip.AddComponent<MeshFilter>().sharedMesh = ProcArt.Mesh(PrimitiveType.Cylinder);
-                _carriedPip.AddComponent<MeshRenderer>().sharedMaterial = ProcArt.Solid(Palette.Cream);
-            }
-            if (_carriedPip != null) _carriedPip.SetActive(carried);
-        }
+        /// <summary>Carried things float above the carrier's head, fanned out by id. Visual only.</summary>
+        void SetCarried(bool carried) =>
+            _lift = carried ? new Vector3((Id % 3 - 1) * 0.3f, 1.05f, 0f) : Vector3.zero;
 
         void Update()
         {
             float dt = Time.deltaTime;
             _glideOffset *= Mathf.Exp(-GlideRate * dt);
-            _visual.localPosition = _glideOffset;
+            _visual.localPosition = _glideOffset + _lift;
+            var facing = _animMode == LookAnim.Critter ? Quaternion.Euler(0, _yaw, 0) : Quaternion.identity;
+            _visual.localRotation = Quaternion.Slerp(_visual.localRotation, facing, 1f - Mathf.Exp(-12f * dt));
 
             _anim01 = Mathf.MoveTowards(_anim01, _animTarget, AnimRate * dt * 0.25f);
             if (_anim == null) return;
@@ -116,6 +130,13 @@ namespace Crawler.Render
                 case LookAnim.Press: _anim.localPosition = new Vector3(0, -0.035f * Smooth(_anim01), 0); break;
                 case LookAnim.Bob:   _anim.localPosition = new Vector3(0, Mathf.Sin(t * 2.2f) * 0.05f, 0); break;
                 case LookAnim.Pulse: _anim.localScale = Vector3.one * (1f + Mathf.Sin(t * 3.4f) * 0.06f); break;
+                case LookAnim.Critter:
+                    bool moving = _glideOffset.sqrMagnitude > 0.0004f;
+                    _anim.localPosition = new Vector3(0,
+                        moving ? Mathf.Abs(Mathf.Sin(t * 16f)) * 0.05f : Mathf.Sin(t * 2f) * 0.008f, 0);
+                    if (_tail != null)
+                        _tail.localRotation = Quaternion.Euler(0, Mathf.Sin(t * (moving ? 6f : 2.4f)) * (moving ? 24f : 14f), 0);
+                    break;
             }
         }
 

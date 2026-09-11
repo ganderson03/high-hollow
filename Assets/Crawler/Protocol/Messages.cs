@@ -91,5 +91,20 @@ namespace Crawler.Protocol
         public InputMsg(uint tick, MoveDir move, bool interact) { Tick = tick; Move = move; Interact = interact; }
     }
 
+    /// <summary>Which level file to load. Server -> client, after welcome.</summary>
+    public sealed class LevelMsg
+    {
+        public string Id;
+    }
+
+    public enum RoundState : byte { Playing, Won }
+
+    /// <summary>Server-decided round state; the client only displays it.</summary>
+    public sealed class RoundMsg
+    {
+        public uint Tick;
+        public RoundState State;
+    }
+
     public enum LinkStatus { Idle, Connecting, Connected, Mock, Disconnected, Failed, ProtocolError }
 }

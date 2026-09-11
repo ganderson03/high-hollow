@@ -15,6 +15,11 @@ namespace Crawler.Render
         [SerializeField] float paddingCells = 5f;
         [SerializeField] float minHalfExtent = 9f;
         [SerializeField] float easeRate = 4f;
+        [SerializeField] float regionPaddingCells = 1.5f;
+        [SerializeField] float regionMinHalfExtent = 5f;
+
+        /// <summary>Room to frame, in grid cells; null falls back to framing visible entities.</summary>
+        public System.Func<RectInt?> RegionSource;
 
         Camera _cam;
         Vector3 _center;
@@ -55,15 +60,29 @@ namespace Crawler.Render
                     max = Vector3.Max(max, c);
                 }
             }
-            foreach (var v in world.Views) if (v.gameObject.activeInHierarchy) Add(v.transform.position);
-            foreach (var v in world.PhantomViews) if (v.gameObject.activeInHierarchy) Add(v.transform.position);
-            if (!any) { Add(new Vector3(0, 0, 0)); Add(new Vector3(GridSpace.Size, 0, GridSpace.Size)); }
+            float pad = paddingCells, minExtent = minHalfExtent;
+            var region = RegionSource?.Invoke();
+            if (region.HasValue)
+            {
+                // Locked to the room the local player is in: steady framing, no zoom breathing.
+                var r = region.Value;
+                Add(new Vector3(r.xMin, 0, r.yMin)); Add(new Vector3(r.xMax, 0, r.yMin));
+                Add(new Vector3(r.xMin, 0, r.yMax)); Add(new Vector3(r.xMax, 0, r.yMax));
+                pad = regionPaddingCells;
+                minExtent = regionMinHalfExtent;
+            }
+            else
+            {
+                foreach (var v in world.Views) if (v.gameObject.activeInHierarchy) Add(v.transform.position);
+                foreach (var v in world.PhantomViews) if (v.gameObject.activeInHierarchy) Add(v.transform.position);
+                if (!any) { Add(new Vector3(0, 0, 0)); Add(new Vector3(GridSpace.Size, 0, GridSpace.Size)); }
+            }
 
             Vector3 midCam = (min + max) * 0.5f;
             Vector3 targetCenter = rot * midCam;
-            float halfH = (max.y - min.y) * 0.5f + paddingCells;
-            float halfW = (max.x - min.x) * 0.5f + paddingCells;
-            float targetSize = Mathf.Max(minHalfExtent, halfH, halfW / Mathf.Max(0.1f, _cam.aspect));
+            float halfH = (max.y - min.y) * 0.5f + pad;
+            float halfW = (max.x - min.x) * 0.5f + pad;
+            float targetSize = Mathf.Max(minExtent, halfH, halfW / Mathf.Max(0.1f, _cam.aspect));
 
             // Visual easing of the camera only; derived, never fed back.
             float k2 = _primed ? 1f - Mathf.Exp(-easeRate * Time.deltaTime) : 1f;
