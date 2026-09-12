@@ -29,13 +29,22 @@ namespace Crawler.Render
 
             var walls = Child("Walls");
             var trees = Child("Trees");
+            var scatter = Child("Scatter");
+            var grey = Palette.Boulder;
+
+            // Warm sky, sienna-tinted ground bounce: keeps shadows from going cold.
+            RenderSettings.ambientMode = UnityEngine.Rendering.AmbientMode.Trilight;
+            RenderSettings.ambientSkyColor = Color.Lerp(Palette.Cream, Palette.Ochre, 0.3f) * 0.75f;
+            RenderSettings.ambientEquatorColor = Color.Lerp(Palette.Sand, Palette.Moss, 0.3f) * 0.55f;
+            RenderSettings.ambientGroundColor = Palette.Sienna * 0.35f;
             var stone = new[]
             {
-                ProcArt.Solid(Palette.Stone),
-                ProcArt.Solid(Color.Lerp(Palette.Stone, Palette.SandDeep, 0.35f)),
-                ProcArt.Solid(Color.Lerp(Palette.Stone, Palette.Umber, 0.25f)),
+                ProcArt.Solid(grey),
+                ProcArt.Solid(Color.Lerp(grey, Palette.MossDeep, 0.3f)),
+                ProcArt.Solid(Color.Lerp(grey, Palette.Cream, 0.15f)),
             };
-            var cap = ProcArt.Solid(Color.Lerp(Palette.Stone, Palette.Cream, 0.3f));
+            var lichen = ProcArt.Solid(Color.Lerp(Palette.Ochre, Palette.Moss, 0.4f));
+            var tuft = new[] { ProcArt.Solid(Palette.Moss), ProcArt.Solid(Color.Lerp(Palette.Moss, Palette.Ochre, 0.35f)) };
             var needles = new[] { ProcArt.Solid(Palette.Pine), ProcArt.Solid(Palette.Needle) };
             var bark = ProcArt.Solid(Palette.Umber);
             var snow = ProcArt.Solid(Palette.Cream);
@@ -46,16 +55,61 @@ namespace Crawler.Render
                 char t = level.At(x, y);
                 if (t == '#')
                 {
-                    // Rounded stones of slightly varied height; reads as a dry-stone wall.
-                    float h = 0.55f + ProcArt.Hash01(x, y, 1) * 0.3f;
-                    var m = stone[(int)(ProcArt.Hash01(x, y, 2) * 3f) % 3];
-                    Part(walls, PrimitiveType.Cylinder, m, new Vector3(x + .5f, h * .5f, y + .5f), new Vector3(0.98f, h * .5f, 0.98f));
-                    Part(walls, PrimitiveType.Sphere, cap, new Vector3(x + .5f, h, y + .5f), new Vector3(0.96f, 0.22f, 0.96f));
+                    Boulders(walls, x, y, stone, lichen);
+                }
+                else if (!LevelDef.IsSolidTile(t) && t != 'T')
+                {
+                    Scatter(scatter, x, y, stone, tuft, level.RegionAt(x, y) >= 0);
                 }
                 else if (t == 'T' && ProcArt.Hash01(x, y, 3) < treeDensity)
                 {
                     Pine(trees, x, y, needles, bark, snow);
                 }
+            }
+        }
+
+        /// <summary>A heap of two or three squashed boulders per wall cell; low and grey, like scree.</summary>
+        static void Boulders(Transform parent, int x, int y, Material[] stone, Material lichen)
+        {
+            var c = new Vector3(x + .5f, 0f, y + .5f);
+            // Base boulder fills the cell so walls stay continuous.
+            float h = 0.42f + ProcArt.Hash01(x, y, 1) * 0.22f;
+            var m0 = stone[(int)(ProcArt.Hash01(x, y, 2) * 3f) % 3];
+            Part(parent, PrimitiveType.Sphere, m0, c + new Vector3(0, h * .45f, 0), new Vector3(1.12f, h, 1.12f), ProcArt.Hash01(x, y, 9) * 360f);
+
+            int extra = ProcArt.Hash01(x, y, 10) < 0.55f ? 2 : 1;
+            for (int i = 0; i < extra; i++)
+            {
+                float a = ProcArt.Hash01(x, y, 11 + i) * Mathf.PI * 2f;
+                float r = 0.18f + ProcArt.Hash01(x, y, 13 + i) * 0.15f;
+                float s = 0.38f + ProcArt.Hash01(x, y, 15 + i) * 0.22f;
+                var m = stone[(int)(ProcArt.Hash01(x, y, 17 + i) * 3f) % 3];
+                var p = c + new Vector3(Mathf.Cos(a) * r, h * 0.8f + s * 0.25f, Mathf.Sin(a) * r);
+                Part(parent, PrimitiveType.Sphere, m, p, new Vector3(s, s * 0.7f, s * 0.85f), a * Mathf.Rad2Deg);
+            }
+            if (ProcArt.Hash01(x, y, 19) < 0.3f)
+                Part(parent, PrimitiveType.Sphere, lichen, c + new Vector3(0.1f, h * 0.9f, -0.1f), new Vector3(0.3f, 0.06f, 0.24f));
+        }
+
+        /// <summary>Sparse pebbles and grass tufts on walkable ground. Decoration only; never blocks.</summary>
+        static void Scatter(Transform parent, int x, int y, Material[] stone, Material[] tuft, bool inRoom)
+        {
+            float roll = ProcArt.Hash01(x, y, 20);
+            var c = new Vector3(x + .2f + ProcArt.Hash01(x, y, 21) * .6f, 0f, y + .2f + ProcArt.Hash01(x, y, 22) * .6f);
+            if (roll < (inRoom ? 0.10f : 0.22f))
+            {
+                var m = tuft[ProcArt.Hash01(x, y, 23) < .5f ? 0 : 1];
+                for (int i = 0; i < 3; i++)
+                {
+                    var o = new Vector3((i - 1) * 0.06f, 0.07f, (ProcArt.Hash01(x, y, 24 + i) - .5f) * 0.08f);
+                    var go = Part(parent, PrimitiveType.Capsule, m, c + o, new Vector3(0.035f, 0.08f, 0.035f), 0f);
+                    go.transform.localRotation = Quaternion.Euler((i - 1) * 18f, 0, (i - 1) * -22f);
+                }
+            }
+            else if (roll > (inRoom ? 0.95f : 0.9f))
+            {
+                float s = 0.12f + ProcArt.Hash01(x, y, 27) * 0.1f;
+                Part(parent, PrimitiveType.Sphere, stone[(int)(ProcArt.Hash01(x, y, 28) * 3f) % 3], c + new Vector3(0, s * 0.25f, 0), new Vector3(s, s * 0.55f, s * 0.8f), roll * 900f);
             }
         }
 
@@ -107,14 +161,16 @@ namespace Crawler.Render
             return t;
         }
 
-        static void Part(Transform parent, PrimitiveType type, Material mat, Vector3 pos, Vector3 scale)
+        static GameObject Part(Transform parent, PrimitiveType type, Material mat, Vector3 pos, Vector3 scale, float yaw = 0f)
         {
             var go = new GameObject(type.ToString());
             go.transform.SetParent(parent, false);
             go.transform.localPosition = pos;
+            go.transform.localRotation = Quaternion.Euler(0, yaw, 0);
             go.transform.localScale = scale;
             go.AddComponent<MeshFilter>().sharedMesh = ProcArt.Mesh(type);
             go.AddComponent<MeshRenderer>().sharedMaterial = mat;
+            return go;
         }
 
         void Start()

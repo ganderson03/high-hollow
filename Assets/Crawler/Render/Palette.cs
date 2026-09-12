@@ -28,6 +28,7 @@ namespace Crawler.Render
         public static readonly Color Needle    = Hex(0x3F4A2F); // darker pine
         public static readonly Color Burnt     = Hex(0xC4652F); // poster sunset band
         public static readonly Color Ridge     = Hex(0x9B6B4A); // far mountains
+        public static readonly Color Boulder   = Hex(0x6F6C66); // granite grey; reads warm once lit
 
         public static Color Hex(int rgb) =>
             new Color(((rgb >> 16) & 0xFF) / 255f, ((rgb >> 8) & 0xFF) / 255f, (rgb & 0xFF) / 255f, 1f);
