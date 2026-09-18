@@ -4,9 +4,10 @@ using UnityEngine;
 namespace Crawler.Render
 {
     /// <summary>
-    /// Static terrain: the floor quad, a sienna plinth, and (once a level is known) rounded
-    /// stone walls and a pine forest built from the level's tiles. Purely visual; collision
-    /// belongs to whatever simulates the world.
+    /// Static terrain: the floor quad, a sienna plinth, and (once a level is known) dry-stone
+    /// walls, a pine forest and ground scatter built from the level's tiles. Every piece is a
+    /// flat-shaded procedural mesh. Purely visual; collision belongs to whatever simulates the
+    /// world.
     /// </summary>
     public sealed class GridFloor : MonoBehaviour
     {
@@ -30,68 +31,159 @@ namespace Crawler.Render
             var walls = Child("Walls");
             var trees = Child("Trees");
             var scatter = Child("Scatter");
-            var grey = Palette.Boulder;
 
             // Warm sky, sienna-tinted ground bounce: keeps shadows from going cold.
             RenderSettings.ambientMode = UnityEngine.Rendering.AmbientMode.Trilight;
             RenderSettings.ambientSkyColor = Color.Lerp(Palette.Cream, Palette.Ochre, 0.3f) * 0.75f;
             RenderSettings.ambientEquatorColor = Color.Lerp(Palette.Sand, Palette.Moss, 0.3f) * 0.55f;
             RenderSettings.ambientGroundColor = Palette.Sienna * 0.35f;
+
+            var grey = Palette.Boulder;
             var stone = new[]
             {
                 ProcArt.Solid(grey),
                 ProcArt.Solid(Color.Lerp(grey, Palette.MossDeep, 0.3f)),
                 ProcArt.Solid(Color.Lerp(grey, Palette.Cream, 0.15f)),
             };
-            var lichen = ProcArt.Solid(Color.Lerp(Palette.Ochre, Palette.Moss, 0.4f));
+            var lichen = ProcArt.Solid(Color.Lerp(Palette.Moss, Palette.Needle, 0.45f));
             var tuft = new[] { ProcArt.Solid(Palette.Moss), ProcArt.Solid(Color.Lerp(Palette.Moss, Palette.Ochre, 0.35f)) };
             var needles = new[] { ProcArt.Solid(Palette.Pine), ProcArt.Solid(Palette.Needle) };
             var bark = ProcArt.Solid(Palette.Umber);
             var snow = ProcArt.Solid(Palette.Cream);
 
+            if (Art.Simple)
+            {
+                BuildPlaceholderTerrain(level, walls, trees, stone[0], needles[0]);
+                return;
+            }
+
             for (int y = 0; y < grid; y++)
             for (int x = 0; x < grid; x++)
             {
                 char t = level.At(x, y);
-                if (t == '#')
-                {
-                    Boulders(walls, x, y, stone, lichen);
-                }
-                else if (!LevelDef.IsSolidTile(t) && t != 'T')
-                {
-                    Scatter(scatter, x, y, stone, tuft, level.RegionAt(x, y) >= 0);
-                }
-                else if (t == 'T' && ProcArt.Hash01(x, y, 3) < treeDensity)
-                {
-                    Pine(trees, x, y, needles, bark, snow);
-                }
+                if (t == '#') DryStone(walls, x, y, stone, lichen, WallAxis(level, x, y));
+                else if (t == 'T') { if (ProcArt.Hash01(x, y, 3) < treeDensity) Pine(trees, x, y, needles, bark, snow); }
+                else if (t == '.') Scatter(scatter, x, y, stone, tuft, level.RegionAt(x, y) >= 0);
+                // Cells holding an entity (pits, doors, keys) get no scatter: a pebble sitting
+                // in the mouth of a shaft reads as a bug.
             }
         }
 
-        /// <summary>A heap of two or three squashed boulders per wall cell; low and grey, like scree.</summary>
-        static void Boulders(Transform parent, int x, int y, Material[] stone, Material lichen)
+        /// <summary>
+        /// One box per wall cell and one per tree, no scatter. Roughly a tenth of the objects
+        /// of the real terrain and it builds instantly, which is the point.
+        /// </summary>
+        static void BuildPlaceholderTerrain(LevelDef level, Transform walls, Transform trees, Material stone, Material needle)
         {
-            var c = new Vector3(x + .5f, 0f, y + .5f);
-            // Base boulder fills the cell so walls stay continuous.
-            float h = 0.42f + ProcArt.Hash01(x, y, 1) * 0.22f;
-            var m0 = stone[(int)(ProcArt.Hash01(x, y, 2) * 3f) % 3];
-            Part(parent, PrimitiveType.Sphere, m0, c + new Vector3(0, h * .45f, 0), new Vector3(1.12f, h, 1.12f), ProcArt.Hash01(x, y, 9) * 360f);
-
-            int extra = ProcArt.Hash01(x, y, 10) < 0.55f ? 2 : 1;
-            for (int i = 0; i < extra; i++)
+            var cube = ProcArt.Mesh(PrimitiveType.Cube);
+            for (int y = 0; y < level.Grid; y++)
+            for (int x = 0; x < level.Grid; x++)
             {
-                float a = ProcArt.Hash01(x, y, 11 + i) * Mathf.PI * 2f;
-                float r = 0.18f + ProcArt.Hash01(x, y, 13 + i) * 0.15f;
-                float s = 0.38f + ProcArt.Hash01(x, y, 15 + i) * 0.22f;
-                var m = stone[(int)(ProcArt.Hash01(x, y, 17 + i) * 3f) % 3];
-                var p = c + new Vector3(Mathf.Cos(a) * r, h * 0.8f + s * 0.25f, Mathf.Sin(a) * r);
-                Part(parent, PrimitiveType.Sphere, m, p, new Vector3(s, s * 0.7f, s * 0.85f), a * Mathf.Rad2Deg);
+                char t = level.At(x, y);
+                if (t == '#')
+                    Box(walls, cube, stone, new Vector3(x + 0.5f, 0.3f, y + 0.5f), new Vector3(1f, 0.6f, 1f));
+                else if (t == 'T')
+                    Box(trees, cube, needle, new Vector3(x + 0.5f, 0.35f, y + 0.5f), new Vector3(0.5f, 0.7f, 0.5f));
             }
-            if (ProcArt.Hash01(x, y, 19) < 0.3f)
-                Part(parent, PrimitiveType.Sphere, lichen, c + new Vector3(0.1f, h * 0.9f, -0.1f), new Vector3(0.3f, 0.06f, 0.24f));
         }
 
-        /// <summary>Sparse pebbles and grass tufts on walkable ground. Decoration only; never blocks.</summary>
+        static void Box(Transform parent, Mesh mesh, Material mat, Vector3 pos, Vector3 scale)
+        {
+            var go = new GameObject("Box");
+            go.transform.SetParent(parent, false);
+            go.transform.localPosition = pos;
+            go.transform.localScale = scale;
+            go.AddComponent<MeshFilter>().sharedMesh = mesh;
+            go.AddComponent<MeshRenderer>().sharedMaterial = mat;
+        }
+
+        /// <summary>Which way this run of wall travels, so the stones can be laid along it.</summary>
+        static float WallAxis(LevelDef level, int x, int y)
+        {
+            bool ew = level.At(x - 1, y) == '#' || level.At(x + 1, y) == '#';
+            bool ns = level.At(x, y - 1) == '#' || level.At(x, y + 1) == '#';
+            if (ew && !ns) return 0f;
+            if (ns && !ew) return 90f;
+            return ProcArt.Hash01(x, y, 99) < 0.5f ? 0f : 90f; // corner or pillar: either reads fine
+        }
+
+        /// <summary>
+        /// One cell of dry-stone wall: courses of split stones laid along the run in a running
+        /// bond, each course shorter than the one below, finished with flat capstones. The
+        /// stones are laid lengthways so the joints follow the wall rather than cutting across.
+        /// </summary>
+        static void DryStone(Transform parent, int x, int y, Material[] stone, Material lichen, float axis)
+        {
+            var cellRoot = new GameObject("WallCell").transform;
+            cellRoot.SetParent(parent, false);
+            cellRoot.localPosition = new Vector3(x + 0.5f, 0f, y + 0.5f);
+            cellRoot.localRotation = Quaternion.Euler(0, axis, 0);
+
+            int seed = x * 397 + y;
+            float[] courses = { 0.27f, 0.23f, 0.19f };
+            float baseY = 0f;
+
+            for (int c = 0; c < courses.Length; c++)
+            {
+                float ch = courses[c] * (0.85f + ProcArt.Hash01(x, y, 30 + c) * 0.3f);
+                int n = c % 2 == 1 ? 3 : 2; // running bond: joints never line up between courses
+                for (int i = 0; i < n; i++)
+                {
+                    float w = 1f / n;
+                    float px = -0.5f + w * (i + 0.5f);
+                    float depth = 0.48f + ProcArt.Hash01(x, y, 40 + c * 4 + i) * 0.12f;
+                    var mesh = MeshGen.Slab(new Vector3(w * 0.92f, ch, depth), seed + c * 17 + i, 0.18f, 0.86f);
+                    var m = stone[(int)(ProcArt.Hash01(x, y, 50 + c * 3 + i) * 3f) % 3];
+                    float yaw = (ProcArt.Hash01(x, y, 60 + c * 3 + i) - 0.5f) * 12f;
+                    float sideways = (ProcArt.Hash01(x, y, 65 + c * 3 + i) - 0.5f) * 0.12f;
+                    Piece(cellRoot, mesh, m, new Vector3(px, baseY, sideways), Quaternion.Euler(0, yaw, 0));
+                }
+                baseY += ch * 0.9f; // courses bed into each other slightly
+            }
+
+            // Capstones: flat slabs across the run, the top surface of the wall.
+            for (int i = 0; i < 2; i++)
+            {
+                var mesh = MeshGen.Slab(new Vector3(0.47f, 0.12f, 0.56f), seed + 200 + i, 0.12f, 0.92f);
+                var m = stone[(int)(ProcArt.Hash01(x, y, 70 + i) * 3f) % 3];
+                Piece(cellRoot, mesh, m, new Vector3(-0.25f + i * 0.5f, baseY, 0f),
+                      Quaternion.Euler(0, (ProcArt.Hash01(x, y, 80 + i) - 0.5f) * 10f, 0));
+            }
+
+            if (ProcArt.Hash01(x, y, 19) < 0.22f)
+                Piece(cellRoot, MeshGen.Slab(new Vector3(0.18f, 0.02f, 0.14f), seed + 300, 0.35f, 1f), lichen,
+                      new Vector3(0.1f, baseY + 0.11f, -0.1f), Quaternion.Euler(0, 24f, 0));
+        }
+
+        /// <summary>Tapered trunk with three faceted cone tiers, tilted slightly per tier.</summary>
+        void Pine(Transform parent, int x, int y, Material[] needles, Material bark, Material snow)
+        {
+            float s = 0.78f + ProcArt.Hash01(x, y, 4) * 0.5f;
+            var jitter = new Vector3((ProcArt.Hash01(x, y, 5) - .5f) * .35f, 0f, (ProcArt.Hash01(x, y, 6) - .5f) * .35f);
+            var root = new GameObject("Pine").transform;
+            root.SetParent(parent, false);
+            root.localPosition = new Vector3(x + .5f, 0f, y + .5f) + jitter;
+            root.localScale = Vector3.one * s;
+            root.localRotation = Quaternion.Euler(0, ProcArt.Hash01(x, y, 9) * 360f, 0);
+
+            int seed = x * 131 + y;
+            var m = needles[ProcArt.Hash01(x, y, 7) < .5f ? 0 : 1];
+            Piece(root, MeshGen.Prism(5, 0.075f, 0.05f, 0.3f, seed, 0.1f), bark, Vector3.zero, Quaternion.identity);
+
+            float[] tierY = { 0.2f, 0.5f, 0.8f };
+            float[] tierR = { 0.42f, 0.33f, 0.22f };
+            float[] tierH = { 0.46f, 0.42f, 0.38f };
+            for (int i = 0; i < 3; i++)
+            {
+                float tilt = (ProcArt.Hash01(x, y, 90 + i) - 0.5f) * 7f;
+                Piece(root, MeshGen.Prism(6, tierR[i], 0.02f, tierH[i], seed + i, 0.12f, i * 22f), m,
+                      new Vector3(0, tierY[i], 0), Quaternion.Euler(tilt, 0, tilt * 0.6f));
+            }
+            if (ProcArt.Hash01(x, y, 8) < 0.35f)
+                Piece(root, MeshGen.Prism(6, 0.1f, 0.01f, 0.16f, seed + 7, 0.14f), snow, new Vector3(0, 1.06f, 0), Quaternion.identity);
+        }
+
+        /// <summary>Sparse pebbles and grass blades on walkable ground. Decoration only.</summary>
         static void Scatter(Transform parent, int x, int y, Material[] stone, Material[] tuft, bool inRoom)
         {
             float roll = ProcArt.Hash01(x, y, 20);
@@ -101,34 +193,17 @@ namespace Crawler.Render
                 var m = tuft[ProcArt.Hash01(x, y, 23) < .5f ? 0 : 1];
                 for (int i = 0; i < 3; i++)
                 {
-                    var o = new Vector3((i - 1) * 0.06f, 0.07f, (ProcArt.Hash01(x, y, 24 + i) - .5f) * 0.08f);
-                    var go = Part(parent, PrimitiveType.Capsule, m, c + o, new Vector3(0.035f, 0.08f, 0.035f), 0f);
-                    go.transform.localRotation = Quaternion.Euler((i - 1) * 18f, 0, (i - 1) * -22f);
+                    var blade = MeshGen.Prism(3, 0.028f, 0.006f, 0.15f + ProcArt.Hash01(x, y, 24 + i) * 0.07f, x * 7 + y + i, 0.2f);
+                    Piece(parent, blade, m, c + new Vector3((i - 1) * 0.055f, 0f, (ProcArt.Hash01(x, y, 27 + i) - .5f) * 0.07f),
+                          Quaternion.Euler((i - 1) * 14f, ProcArt.Hash01(x, y, 31 + i) * 360f, (i - 1) * -17f));
                 }
             }
             else if (roll > (inRoom ? 0.95f : 0.9f))
             {
-                float s = 0.12f + ProcArt.Hash01(x, y, 27) * 0.1f;
-                Part(parent, PrimitiveType.Sphere, stone[(int)(ProcArt.Hash01(x, y, 28) * 3f) % 3], c + new Vector3(0, s * 0.25f, 0), new Vector3(s, s * 0.55f, s * 0.8f), roll * 900f);
+                float sz = 0.16f + ProcArt.Hash01(x, y, 27) * 0.12f;
+                var mesh = MeshGen.Slab(new Vector3(sz, sz * 0.4f, sz * 0.8f), x * 31 + y, 0.3f, 0.7f);
+                Piece(parent, mesh, stone[(int)(ProcArt.Hash01(x, y, 28) * 3f) % 3], c, Quaternion.Euler(0, roll * 900f, 0));
             }
-        }
-
-        void Pine(Transform parent, int x, int y, Material[] needles, Material bark, Material snow)
-        {
-            float s = 0.75f + ProcArt.Hash01(x, y, 4) * 0.5f;
-            var jitter = new Vector3((ProcArt.Hash01(x, y, 5) - .5f) * .35f, 0f, (ProcArt.Hash01(x, y, 6) - .5f) * .35f);
-            var root = new GameObject("Pine").transform;
-            root.SetParent(parent, false);
-            root.localPosition = new Vector3(x + .5f, 0f, y + .5f) + jitter;
-            root.localScale = Vector3.one * s;
-
-            var m = needles[ProcArt.Hash01(x, y, 7) < .5f ? 0 : 1];
-            Part(root, PrimitiveType.Cylinder, bark, new Vector3(0, 0.12f, 0), new Vector3(0.14f, 0.12f, 0.14f));
-            Part(root, PrimitiveType.Sphere, m, new Vector3(0, 0.45f, 0), new Vector3(0.85f, 0.45f, 0.85f));
-            Part(root, PrimitiveType.Sphere, m, new Vector3(0, 0.85f, 0), new Vector3(0.62f, 0.38f, 0.62f));
-            Part(root, PrimitiveType.Sphere, m, new Vector3(0, 1.18f, 0), new Vector3(0.38f, 0.30f, 0.38f));
-            if (ProcArt.Hash01(x, y, 8) < 0.35f)
-                Part(root, PrimitiveType.Sphere, snow, new Vector3(0, 1.34f, 0), new Vector3(0.2f, 0.1f, 0.2f));
         }
 
         void BuildFloor(Texture2D tex)
@@ -149,9 +224,22 @@ namespace Crawler.Render
             plinth.AddComponent<MeshRenderer>().sharedMaterial = ProcArt.Solid(Palette.Sienna);
         }
 
+        /// <summary>
+        /// Roots this component owns. Anything else under the same transform (the entity and
+        /// phantom roots WorldView keeps, say) is somebody else's and must survive a rebuild.
+        /// </summary>
+        static readonly string[] Generated = { "Tiles", "Plinth", "Walls", "Trees", "Scatter", "ScenePreview" };
+
         void Clear()
         {
-            for (int i = transform.childCount - 1; i >= 0; i--) Destroy(transform.GetChild(i).gameObject);
+            for (int i = transform.childCount - 1; i >= 0; i--)
+            {
+                var go = transform.GetChild(i).gameObject;
+                if (System.Array.IndexOf(Generated, go.name) < 0) continue;
+                // Immediate on purpose: a rebuild recreates these same names right away, and a
+                // deferred Destroy would leave the old copy standing for the rest of the frame.
+                DestroyImmediate(go);
+            }
         }
 
         Transform Child(string n)
@@ -161,21 +249,20 @@ namespace Crawler.Render
             return t;
         }
 
-        static GameObject Part(Transform parent, PrimitiveType type, Material mat, Vector3 pos, Vector3 scale, float yaw = 0f)
+        static GameObject Piece(Transform parent, Mesh mesh, Material mat, Vector3 pos, Quaternion rot)
         {
-            var go = new GameObject(type.ToString());
+            var go = new GameObject(mesh.name);
             go.transform.SetParent(parent, false);
             go.transform.localPosition = pos;
-            go.transform.localRotation = Quaternion.Euler(0, yaw, 0);
-            go.transform.localScale = scale;
-            go.AddComponent<MeshFilter>().sharedMesh = ProcArt.Mesh(type);
+            go.transform.localRotation = rot;
+            go.AddComponent<MeshFilter>().sharedMesh = mesh;
             go.AddComponent<MeshRenderer>().sharedMaterial = mat;
             return go;
         }
 
         void Start()
         {
-            if (transform.childCount == 0) Build(grid);
+            if (transform.Find("Tiles") == null) Build(grid);
         }
     }
 }

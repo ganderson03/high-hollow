@@ -24,9 +24,11 @@ namespace Crawler.Render
             {
                 if (_fur != null) return _fur;
                 _fur = Textured(Rosettes, Color.white);
-                // Smaller rosettes: at 1x they stretch into tiger stripes on the small spheres.
-                _fur.SetTextureScale("_BaseMap", new Vector2(2.5f, 2.5f));
-                _fur.mainTextureScale = new Vector2(2.5f, 2.5f);
+                // The faceted body parts carry planar UVs in local metres, so a body panel is
+                // well under one texture unit across. Tile hard or the rosettes come out huge.
+                var tiling = new Vector2(7f, 7f);
+                _fur.SetTextureScale("_BaseMap", tiling);
+                _fur.mainTextureScale = tiling;
                 return _fur;
             }
         }
@@ -47,6 +49,12 @@ namespace Crawler.Render
             _paw = null;
             _fur = null;
         }
+
+        /// <summary>
+        /// Drops every cached material and texture. The editor scene builder calls this after
+        /// it clears the generated asset folder, since those assets are the cached objects.
+        /// </summary>
+        public static void ClearCache() => ResetStatics();
 
         static Shader Lit
         {
@@ -86,7 +94,8 @@ namespace Crawler.Render
             if (_meshes.TryGetValue(type, out var m) && m != null) return m;
             var go = GameObject.CreatePrimitive(type);
             m = go.GetComponent<MeshFilter>().sharedMesh;
-            Object.Destroy(go);
+            // The editor scene builder runs outside play mode, where Destroy is refused.
+            if (Application.isPlaying) Object.Destroy(go); else Object.DestroyImmediate(go);
             _meshes[type] = m;
             return m;
         }
@@ -275,7 +284,7 @@ namespace Crawler.Render
         // ------------------------------------------------------------------ poster
 
         /// <summary>
-        /// 1970s national-park poster: banded sunset, a striped sun, three mountain ranges
+        /// 1970s national-park poster: banded sunset, a solid sun, three mountain ranges
         /// with snowcaps, and a pine-silhouette foreground. Used by the title and win screens.
         /// </summary>
         public static Texture2D Poster(int w, int h)
@@ -295,16 +304,10 @@ namespace Crawler.Render
                     Color c = SkyBand(v);
 
                     float dx = (u - sunX) * aspect, dy = v - sunY;
-                    if (dx * dx + dy * dy < sunR * sunR)
-                    {
-                        bool cut = false;
-                        if (dy < 0f)
-                        {
-                            float depth = -dy / sunR;
-                            cut = Frac(-dy / 0.032f) < 0.12f + 0.45f * depth;
-                        }
-                        if (!cut) c = Palette.Cream;
-                    }
+                    // Solid disc. It used to be banded across its lower half, but the ranges
+                    // cover that half, so all that survived was one stray sienna sliver sitting
+                    // across the sun like a scratch.
+                    if (dx * dx + dy * dy < sunR * sunR) c = Palette.Cream;
 
                     float far = Ridge(u, 0.50f, 0.05f, 1.6f, 0.3f) + 0.08f * Peak(u, 0.28f, 0.10f) + 0.10f * Peak(u, 0.72f, 0.09f);
                     float mid = Ridge(u, 0.37f, 0.04f, 1.2f, 2.0f) + 0.12f * Peak(u, 0.50f, 0.14f);

@@ -1,0 +1,19 @@
+{
+    "name": "Crawler.EditorTools",
+    "rootNamespace": "Crawler.EditorTools",
+    "references": [
+        "Crawler.Protocol",
+        "Crawler.Render"
+    ],
+    "includePlatforms": [
+        "Editor"
+    ],
+    "excludePlatforms": [],
+    "allowUnsafeCode": false,
+    "overrideReferences": false,
+    "precompiledReferences": [],
+    "autoReferenced": true,
+    "defineConstraints": [],
+    "versionDefines": [],
+    "noEngineReferences": false
+}

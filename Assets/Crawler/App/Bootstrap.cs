@@ -23,6 +23,7 @@ namespace Crawler.App
         [SerializeField] string mockLevelId = "hollow";
 
         [Header("Presentation")]
+        [SerializeField] ArtStyle artStyle = ArtStyle.Poster;
         [SerializeField] string gameTitle = "HIGH HOLLOW";
         [SerializeField] string tagline = "a co-op puzzle crawl";
 
@@ -48,6 +49,7 @@ namespace Crawler.App
 
         void Start()
         {
+            Art.Style = artStyle; // read by the view layers as they build
             ProcCursor.Apply();
 
             var canvas = chat.transform.parent;

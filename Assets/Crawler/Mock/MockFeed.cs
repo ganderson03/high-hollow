@@ -224,6 +224,15 @@ namespace Crawler.Mock
                         ? "something unseen bites. back to camp. (the sightstone by the door might help.)"
                         : "ouch. back to camp.");
                     _pos[0] = _spawn[0];
+                    // A fall costs the run: carried keys drop back where they were found,
+                    // otherwise the pits are free to walk into.
+                    if (_carried.Count > 0)
+                    {
+                        Say(_carried.Count == 1 ? "the key slips loose and lands back where it lay."
+                                                : $"all {_carried.Count} keys slip loose and land back where they lay.");
+                        _carried.Clear();
+                        _gateAnnounced = false;
+                    }
                     return;
                 }
                 if (e.Kind == EntityKind.Key && _carried.Add(id))
