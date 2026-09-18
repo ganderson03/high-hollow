@@ -1,0 +1,14 @@
+{
+    "name": "Crawler.Net",
+    "rootNamespace": "Crawler.Net",
+    "references": ["Crawler.Protocol"],
+    "includePlatforms": [],
+    "excludePlatforms": [],
+    "allowUnsafeCode": false,
+    "overrideReferences": false,
+    "precompiledReferences": [],
+    "autoReferenced": true,
+    "defineConstraints": [],
+    "versionDefines": [],
+    "noEngineReferences": true
+}

@@ -1,0 +1,23 @@
+{
+    "name": "Crawler.App",
+    "rootNamespace": "Crawler.App",
+    "references": [
+        "Crawler.Protocol",
+        "Crawler.Net",
+        "Crawler.Mock",
+        "Crawler.Render",
+        "Crawler.Input",
+        "Crawler.UI",
+        "Unity.InputSystem",
+        "UnityEngine.UI"
+    ],
+    "includePlatforms": [],
+    "excludePlatforms": [],
+    "allowUnsafeCode": false,
+    "overrideReferences": false,
+    "precompiledReferences": [],
+    "autoReferenced": true,
+    "defineConstraints": [],
+    "versionDefines": [],
+    "noEngineReferences": false
+}
