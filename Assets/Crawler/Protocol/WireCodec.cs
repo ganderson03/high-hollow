@@ -27,14 +27,27 @@ namespace Crawler.Protocol
                 switch ((string)o["t"])
                 {
                     case "welcome":
+                        // "grid" is the old square form; width/height replace it.
+                        int w = o["width"] != null ? (int)o["width"] : (int)o["grid"];
+                        int h = o["height"] != null ? (int)o["height"] : (int)o["grid"];
                         handler.OnWelcome(new Welcome
                         {
                             ClientId = (byte)o["client_id"],
-                            Grid = (int)o["grid"],
+                            Width = w,
+                            Height = h,
                             TickHz = (int)o["tick_hz"],
                             ReplicationHz = (int)o["replication_hz"],
                         });
                         return true;
+
+                    case "seats":
+                    {
+                        var yours = (JArray)o["yours"];
+                        var seats = new SeatsMsg { Yours = new int[yours.Count], Active = (int)o["active"] };
+                        for (int i = 0; i < yours.Count; i++) seats.Yours[i] = (int)yours[i];
+                        handler.OnSeats(seats);
+                        return true;
+                    }
 
                     case "snapshot":
                         handler.OnSnapshot(DecodeSnapshot(o));
@@ -131,7 +144,8 @@ namespace Crawler.Protocol
             {
                 Field(w, "t", "welcome");
                 w.WritePropertyName("client_id"); w.WriteValue(m.ClientId);
-                w.WritePropertyName("grid"); w.WriteValue(m.Grid);
+                w.WritePropertyName("width"); w.WriteValue(m.Width);
+                w.WritePropertyName("height"); w.WriteValue(m.Height);
                 w.WritePropertyName("tick_hz"); w.WriteValue(m.TickHz);
                 w.WritePropertyName("replication_hz"); w.WriteValue(m.ReplicationHz);
             });
@@ -180,6 +194,18 @@ namespace Crawler.Protocol
                 w.WritePropertyName("tick"); w.WriteValue(m.Tick);
                 Field(w, "state", m.State == RoundState.Won ? "won" : "playing");
             });
+
+        public static string EncodeSeats(SeatsMsg m) =>
+            Write(w =>
+            {
+                Field(w, "t", "seats");
+                w.WritePropertyName("yours");
+                w.WriteStartArray(); foreach (var s in m.Yours) w.WriteValue(s); w.WriteEndArray();
+                w.WritePropertyName("active"); w.WriteValue(m.Active);
+            });
+
+        public static string EncodeControl(int seat) =>
+            Write(w => { Field(w, "t", "control"); w.WritePropertyName("seat"); w.WriteValue(seat); });
 
         // ---------------------------------------------------------------- helpers
 

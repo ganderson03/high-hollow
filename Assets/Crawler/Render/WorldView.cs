@@ -21,21 +21,23 @@ namespace Crawler.Render
 
         EntityState[] _entities = new EntityState[0];
         Overlay _overlay = Overlay.Empty;
-        int _localClient = -1;
+        int[] _owned = new int[0];
+        int _active = -1;
 
         /// <summary>
-        /// ASSUMPTION until the protocol says otherwise: the Nth Player entity (by id order)
-        /// belongs to client N. Used only to draw the local-player marker.
+        /// Which leopards this client controls and which one it is steering, from the server's
+        /// Seats message. Seat N is the Nth Player entity by id. Drives the rings and the camera.
         /// </summary>
-        public void SetLocalClient(int clientId)
+        public void SetSeats(int[] owned, int active)
         {
-            _localClient = clientId;
+            _owned = owned ?? new int[0];
+            _active = active;
             Rebuild();
         }
 
         public uint LastTick { get; private set; }
 
-        /// <summary>Local player's authoritative cell from the latest snapshot (perception use only).</summary>
+        /// <summary>The steered leopard's authoritative cell from the latest snapshot (perception use only).</summary>
         public Vector2Int? LocalCell { get; private set; }
         public bool HasSnapshot { get; private set; }
 
@@ -83,10 +85,15 @@ namespace Crawler.Render
                 bool visible = !_hidden.Contains(id);
                 int look = _substituted.TryGetValue(id, out var sub) ? sub : Looks.ForKind(s.Kind);
                 v.Bind(id, s, look, visible);
-                bool isLocal = s.Kind == EntityKind.Player && playerOrdinal == _localClient;
-                v.SetLocal(isLocal);
+                int marker = 0;
+                if (s.Kind == EntityKind.Player)
+                {
+                    if (playerOrdinal == _active) marker = 1;
+                    else if (System.Array.IndexOf(_owned, playerOrdinal) >= 0) marker = 2;
+                }
+                v.SetMarker(marker);
                 v.SetAccent(s.Kind == EntityKind.Player ? ScarfFor(playerOrdinal) : (Color?)null);
-                if (isLocal) LocalCell = new Vector2Int(s.X, s.Y);
+                if (marker == 1) LocalCell = new Vector2Int(s.X, s.Y);
                 if (s.Kind == EntityKind.Player) playerOrdinal++;
             }
 
@@ -98,12 +105,13 @@ namespace Crawler.Render
                 if (i >= ph.Length) { _phantoms[i].gameObject.SetActive(false); continue; }
                 var p = ph[i];
                 _phantoms[i].Bind(-1, new EntityState(p.X, p.Y, EntityKind.Player, 0, -1), p.Look, true);
-                _phantoms[i].SetLocal(false);
+                _phantoms[i].SetMarker(0);
                 _phantoms[i].SetAccent(null);
             }
         }
 
-        static readonly Color[] Scarves = { Palette.Sienna, Palette.Pine, Palette.Ochre };
+        /// <summary>Seat 0 wears sienna, seat 1 pine.</summary>
+        static readonly Color[] Scarves = { Palette.Sienna, Palette.Pine };
 
         static Color ScarfFor(int playerOrdinal) => Scarves[playerOrdinal % Scarves.Length];
 

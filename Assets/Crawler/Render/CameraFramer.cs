@@ -75,7 +75,7 @@ namespace Crawler.Render
             {
                 foreach (var v in world.Views) if (v.gameObject.activeInHierarchy) Add(v.transform.position);
                 foreach (var v in world.PhantomViews) if (v.gameObject.activeInHierarchy) Add(v.transform.position);
-                if (!any) { Add(new Vector3(0, 0, 0)); Add(new Vector3(GridSpace.Size, 0, GridSpace.Size)); }
+                if (!any) { Add(new Vector3(0, 0, 0)); Add(new Vector3(GridSpace.Width, 0, GridSpace.Height)); }
             }
 
             Vector3 midCam = (min + max) * 0.5f;

@@ -41,7 +41,11 @@ namespace Crawler.App
         string _lastDetail;
 
         LevelDef _level;
+        TrailDef _trail;
+        int[] _seats = new int[0];
+        int _activeSeat = -1;
         int _region = -1;
+        float _roomBannerAfter; // the level's own banner gets a moment before room names take over
         PosterScreen _poster;
         RegionBanner _banner;
         float _roundStart;
@@ -58,6 +62,7 @@ namespace Crawler.App
             _poster = Make<PosterScreen>("PosterScreen", canvas); // created last so it draws over the HUD
 
             input.TickSource = () => world.LastTick;
+            input.OnSwitch = SwitchLeopard;
             input.Suppressed = () => chat.IsTyping || PosterBlocking();
             chat.Blocked = PosterBlocking;
             chat.OnSubmit = text => _link?.SendChat(text);
@@ -73,6 +78,9 @@ namespace Crawler.App
         void StartLink()
         {
             if (_link != null) return;
+            _trail = LevelStore.LoadTrail(out var trailErr);
+            if (_trail == null) Debug.LogWarning("[Level] " + trailErr + " (levels will not chain)");
+
             if (useMockFeed)
             {
                 var lvl = LevelStore.Load(mockLevelId, out var err);
@@ -82,7 +90,7 @@ namespace Crawler.App
                     chat.AddSystem("could not load the mock level: " + err);
                     return;
                 }
-                _link = new MockFeed(lvl);
+                _link = new MockFeed(lvl, _trail, id => LevelStore.Load(id, out _));
             }
             else
             {
@@ -114,8 +122,26 @@ namespace Crawler.App
             int r = _level.RegionAt(cell.Value.x, cell.Value.y);
             if (r < 0 || r == _region) return; // corridors keep the last room
             _region = r;
+            if (Time.time < _roomBannerAfter) return;
             var reg = _level.Regions[r];
             _banner.Show(reg.Name, reg.Subtitle);
+        }
+
+        /// <summary>Tab: steer the other leopard, if this client holds both. The server confirms with Seats.</summary>
+        void SwitchLeopard()
+        {
+            if (_link == null || _seats.Length < 2) return;
+            int i = System.Array.IndexOf(_seats, _activeSeat);
+            _link.SendControl(_seats[(i + 1) % _seats.Length]);
+        }
+
+        /// <summary>"Foothills, 2 of 4", or the level name alone if the trail does not list it.</summary>
+        string TrailPlace(string levelId)
+        {
+            if (_trail == null || !_trail.Locate(levelId, out var biome, out int index)) return "";
+            return biome.IsFinale(index)
+                ? $"{biome.Name}  ·  finale"
+                : $"{biome.Name}  ·  {index + 1} of {biome.Levels.Count}";
         }
 
         RectInt? CurrentRegionRect()
@@ -137,11 +163,11 @@ namespace Crawler.App
         public void OnWelcome(Welcome m)
         {
             _localClient = m.ClientId;
-            world.SetLocalClient(m.ClientId);
-            GridSpace.Size = m.Grid;
-            if (_level == null) floor.Build(m.Grid);
+            GridSpace.Width = m.Width;
+            GridSpace.Height = m.Height;
+            if (_level == null) floor.Build(Mathf.Max(m.Width, m.Height));
             input.SetReplicationHz(m.ReplicationHz);
-            chat.AddSystem($"welcome: client {m.ClientId}, grid {m.Grid}, {m.TickHz} Hz sim / {m.ReplicationHz} Hz replication");
+            Debug.Log($"[Link] welcome: client {m.ClientId}, {m.Width}x{m.Height}, {m.TickHz} Hz sim / {m.ReplicationHz} Hz replication");
         }
 
         public void OnLevel(LevelMsg m)
@@ -154,8 +180,11 @@ namespace Crawler.App
             }
             _level = lvl;
             _region = -1;
-            GridSpace.Size = lvl.Grid;
+            GridSpace.Width = lvl.Width;
+            GridSpace.Height = lvl.Height;
             floor.BuildLevel(lvl);
+            _banner.Show(lvl.Name, TrailPlace(lvl.Id));
+            _roomBannerAfter = Time.time + 3.5f;
         }
 
         public void OnRound(RoundMsg m)
@@ -164,9 +193,14 @@ namespace Crawler.App
             {
                 _won = true;
                 int secs = Mathf.Max(0, (int)(Time.time - _roundStart));
+                string time = $"{secs / 60}:{secs % 60:00}";
+                string id = _level != null ? _level.Id : "";
+                string next = _trail?.Next(id);
+                string nextName = next != null ? LevelStore.Load(next, out _)?.Name ?? next : null;
                 _poster.Show(Typeset.Spaced("SUMMIT REACHED"),
-                    $"the hollow is yours  ·  {secs / 60}:{secs % 60:00}",
-                    "the trail resets shortly", false);
+                    $"{(_level != null ? _level.Name : "")}  ·  {time}",
+                    nextName != null ? $"onward to {nextName}" : _trail != null ? "the trail is complete" : "the trail resets shortly",
+                    false);
             }
             else
             {
@@ -175,6 +209,14 @@ namespace Crawler.App
                 _roundStart = Time.time;
                 _region = -1; // re-announce the starting room
             }
+        }
+
+        public void OnSeats(SeatsMsg m)
+        {
+            _seats = m.Yours ?? new int[0];
+            _activeSeat = m.Active;
+            world.SetSeats(_seats, _activeSeat);
+            _region = -1; // re-announce the room the newly steered leopard is in
         }
 
         public void OnSnapshot(Snapshot m) => world.ApplySnapshot(m);

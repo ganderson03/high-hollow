@@ -241,11 +241,11 @@ namespace Crawler.Render
         /// <summary>Floor painted from a level: moss tiles in rooms, forest floor outside, bedding under walls.</summary>
         public static Texture2D LevelFloor(LevelDef level, int texelsPerCell)
         {
-            int n = level.Grid * texelsPerCell;
-            var tex = NewFloorTexture(n, "LevelFloor_" + level.Id);
-            var px = new Color[n * n];
-            for (int y = 0; y < n; y++)
-            for (int x = 0; x < n; x++)
+            int nw = level.Width * texelsPerCell, nh = level.Height * texelsPerCell;
+            var tex = NewFloorTexture(nw, nh, "LevelFloor_" + level.Id);
+            var px = new Color[nw * nh];
+            for (int y = 0; y < nh; y++)
+            for (int x = 0; x < nw; x++)
             {
                 int cx = x / texelsPerCell, cy = y / texelsPerCell;
                 char t = level.At(cx, cy);
@@ -257,15 +257,17 @@ namespace Crawler.Render
                     c = Palette.WallBed;
                 else
                     c = MossTexel(x, y, cx, cy, texelsPerCell);
-                px[y * n + x] = c;
+                px[y * nw + x] = c;
             }
             tex.SetPixels(px);
             tex.Apply(true, false);
             return tex;
         }
 
-        static Texture2D NewFloorTexture(int n, string name) =>
-            new Texture2D(n, n, TextureFormat.RGBA32, true)
+        static Texture2D NewFloorTexture(int n, string name) => NewFloorTexture(n, n, name);
+
+        static Texture2D NewFloorTexture(int w, int h, string name) =>
+            new Texture2D(w, h, TextureFormat.RGBA32, true)
                 { name = name, wrapMode = TextureWrapMode.Clamp, filterMode = FilterMode.Bilinear, anisoLevel = 4 };
 
         /// <summary>Quiet moss tile with a thin rounded grout line. Low contrast so pieces read.</summary>

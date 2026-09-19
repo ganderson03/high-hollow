@@ -20,6 +20,9 @@ namespace Crawler.Input
         public Func<uint> TickSource;
         public Func<bool> Suppressed; // e.g. chat field focused
 
+        /// <summary>Tab: switch to the other leopard, when this client holds both.</summary>
+        public Action OnSwitch;
+
         float _accum;
         bool _interactLatched;
         MoveDir _lastPressed = MoveDir.None;
@@ -34,6 +37,7 @@ namespace Crawler.Input
             if (kb != null && !blocked)
             {
                 if (kb.spaceKey.wasPressedThisFrame) _interactLatched = true;
+                if (kb.tabKey.wasPressedThisFrame) { _lastPressed = MoveDir.None; OnSwitch?.Invoke(); }
                 if (Pressed(kb.wKey, kb.upArrowKey)) _lastPressed = MoveDir.N;
                 if (Pressed(kb.sKey, kb.downArrowKey)) _lastPressed = MoveDir.S;
                 if (Pressed(kb.dKey, kb.rightArrowKey)) _lastPressed = MoveDir.E;

@@ -15,18 +15,28 @@ namespace Crawler.Render
         [SerializeField] int texelsPerCell = 16;
         [SerializeField, Range(0f, 1f)] float treeDensity = 0.6f;
 
+        /// <summary>
+        /// Width of the scenery band drawn around the playable map, in cells. It has to cover
+        /// the camera's widest framing past the map's edge (room framing plus padding at a wide
+        /// aspect), so the plinth's edge never shows. Purely visual: nothing can enter it.
+        /// </summary>
+        [SerializeField] int apronCells = 14;
+
+        int _w = 32, _h = 32;
+
         public void Build(int size)
         {
-            grid = size;
+            _w = _h = grid = size;
             Clear();
-            BuildFloor(ProcArt.FloorTiles(grid, texelsPerCell));
+            BuildFloor(ProcArt.FloorTiles(grid, texelsPerCell), apron: 0);
         }
 
         public void BuildLevel(LevelDef level)
         {
-            grid = level.Grid;
+            _w = level.Width;
+            _h = level.Height;
             Clear();
-            BuildFloor(ProcArt.LevelFloor(level, texelsPerCell));
+            BuildFloor(ProcArt.LevelFloor(level, texelsPerCell), apronCells);
 
             var walls = Child("Walls");
             var trees = Child("Trees");
@@ -51,14 +61,16 @@ namespace Crawler.Render
             var bark = ProcArt.Solid(Palette.Umber);
             var snow = ProcArt.Solid(Palette.Cream);
 
+            BuildApron(Child("Apron"), level, needles, bark, snow);
+
             if (Art.Simple)
             {
                 BuildPlaceholderTerrain(level, walls, trees, stone[0], needles[0]);
                 return;
             }
 
-            for (int y = 0; y < grid; y++)
-            for (int x = 0; x < grid; x++)
+            for (int y = 0; y < _h; y++)
+            for (int x = 0; x < _w; x++)
             {
                 char t = level.At(x, y);
                 if (t == '#') DryStone(walls, x, y, stone, lichen, WallAxis(level, x, y));
@@ -76,8 +88,8 @@ namespace Crawler.Render
         static void BuildPlaceholderTerrain(LevelDef level, Transform walls, Transform trees, Material stone, Material needle)
         {
             var cube = ProcArt.Mesh(PrimitiveType.Cube);
-            for (int y = 0; y < level.Grid; y++)
-            for (int x = 0; x < level.Grid; x++)
+            for (int y = 0; y < level.Height; y++)
+            for (int x = 0; x < level.Width; x++)
             {
                 char t = level.At(x, y);
                 if (t == '#')
@@ -206,29 +218,96 @@ namespace Crawler.Render
             }
         }
 
-        void BuildFloor(Texture2D tex)
+        void BuildFloor(Texture2D tex, int apron)
         {
             var floor = new GameObject("Tiles");
             floor.transform.SetParent(transform, false);
-            floor.transform.localPosition = new Vector3(grid * 0.5f, 0f, grid * 0.5f);
+            floor.transform.localPosition = new Vector3(_w * 0.5f, 0f, _h * 0.5f);
             floor.transform.localRotation = Quaternion.Euler(90, 0, 0);
-            floor.transform.localScale = new Vector3(grid, grid, 1);
+            floor.transform.localScale = new Vector3(_w, _h, 1);
             floor.AddComponent<MeshFilter>().sharedMesh = ProcArt.Mesh(PrimitiveType.Quad);
             floor.AddComponent<MeshRenderer>().sharedMaterial = ProcArt.Textured(tex, Color.white);
 
+            // The plinth sits under the apron, so its sienna edge is out beyond the scenery.
             var plinth = new GameObject("Plinth");
             plinth.transform.SetParent(transform, false);
-            plinth.transform.localPosition = new Vector3(grid * 0.5f, -0.26f, grid * 0.5f);
-            plinth.transform.localScale = new Vector3(grid + 0.6f, 0.5f, grid + 0.6f);
+            plinth.transform.localPosition = new Vector3(_w * 0.5f, -0.26f, _h * 0.5f);
+            plinth.transform.localScale = new Vector3(_w + 2 * apron + 0.6f, 0.5f, _h + 2 * apron + 0.6f);
             plinth.AddComponent<MeshFilter>().sharedMesh = ProcArt.Mesh(PrimitiveType.Cube);
             plinth.AddComponent<MeshRenderer>().sharedMaterial = ProcArt.Solid(Palette.Sienna);
+        }
+
+        /// <summary>
+        /// The scenery band around the map: forest-floor ground, and in the poster style a
+        /// thinning stand of pines. Placeholder style keeps only the ground.
+        /// </summary>
+        void BuildApron(Transform root, LevelDef level, Material[] needles, Material bark, Material snow)
+        {
+            int a = apronCells;
+            if (a <= 0) return;
+
+            // Between the plinth's top (y = -0.01) and the map floor (y = 0), so neither
+            // z-fights with it and the map quad still covers its middle.
+            var ground = new GameObject("Ground");
+            ground.transform.SetParent(root, false);
+            ground.transform.localPosition = new Vector3(_w * 0.5f, -0.004f, _h * 0.5f);
+            ground.transform.localRotation = Quaternion.Euler(90, 0, 0);
+            ground.transform.localScale = new Vector3(_w + 2 * a, _h + 2 * a, 1);
+            ground.AddComponent<MeshFilter>().sharedMesh = ProcArt.Mesh(PrimitiveType.Quad);
+            ground.AddComponent<MeshRenderer>().sharedMaterial = ProcArt.Solid(Color.Lerp(Palette.Forest, Palette.Forest2, 0.4f));
+
+            if (Art.Simple) return;
+
+            var stand = new GameObject("Stand").transform;
+            stand.SetParent(root, false);
+            for (int y = -a; y < _h + a; y++)
+            for (int x = -a; x < _w + a; x++)
+            {
+                if (x >= 0 && y >= 0 && x < _w && y < _h) continue;
+                // Densest against the map, thinning outward, so the map reads as a clearing.
+                int d = Mathf.Max(Mathf.Max(-x, x - (_w - 1)), Mathf.Max(-y, y - (_h - 1)));
+                float density = Mathf.Lerp(0.75f, 0.3f, d / (float)a);
+                if (ProcArt.Hash01(x + 1000, y + 1000, 3) < density)
+                    Pine(stand, x, y, needles, bark, snow);
+            }
+            Merge(stand, root, "ApronPines");
+        }
+
+        /// <summary>
+        /// Folds every piece under <paramref name="source"/> into one mesh per material under
+        /// <paramref name="target"/>, then removes the pieces. The apron can hold thousands of
+        /// pines, and as separate objects they would cost far more than they are worth.
+        /// </summary>
+        static void Merge(Transform source, Transform target, string name)
+        {
+            var groups = new System.Collections.Generic.Dictionary<Material, System.Collections.Generic.List<CombineInstance>>();
+            var toLocal = target.worldToLocalMatrix;
+            foreach (var mf in source.GetComponentsInChildren<MeshFilter>(true))
+            {
+                var mat = mf.GetComponent<MeshRenderer>().sharedMaterial;
+                if (!groups.TryGetValue(mat, out var list)) groups[mat] = list = new System.Collections.Generic.List<CombineInstance>();
+                list.Add(new CombineInstance { mesh = mf.sharedMesh, transform = toLocal * mf.transform.localToWorldMatrix });
+            }
+
+            int i = 0;
+            foreach (var kv in groups)
+            {
+                var mesh = new Mesh { name = $"{name}_{i}", indexFormat = UnityEngine.Rendering.IndexFormat.UInt32 };
+                mesh.CombineMeshes(kv.Value.ToArray(), true, true);
+                var go = new GameObject(mesh.name);
+                go.transform.SetParent(target, false);
+                go.AddComponent<MeshFilter>().sharedMesh = mesh;
+                go.AddComponent<MeshRenderer>().sharedMaterial = kv.Key;
+                i++;
+            }
+            DestroyImmediate(source.gameObject);
         }
 
         /// <summary>
         /// Roots this component owns. Anything else under the same transform (the entity and
         /// phantom roots WorldView keeps, say) is somebody else's and must survive a rebuild.
         /// </summary>
-        static readonly string[] Generated = { "Tiles", "Plinth", "Walls", "Trees", "Scatter", "ScenePreview" };
+        static readonly string[] Generated = { "Tiles", "Plinth", "Apron", "Walls", "Trees", "Scatter", "ScenePreview" };
 
         void Clear()
         {

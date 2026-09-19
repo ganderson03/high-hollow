@@ -1,0 +1,14 @@
+{
+  "biomes": [
+    {
+      "id": "foothills",
+      "name": "Foothills",
+      "levels": [
+        "foothills-1",
+        "foothills-2",
+        "foothills-3",
+        "hollow"
+      ]
+    }
+  ]
+}

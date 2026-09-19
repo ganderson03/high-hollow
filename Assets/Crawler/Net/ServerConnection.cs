@@ -101,6 +101,8 @@ namespace Crawler.Net
 
         public void SendChat(string text) => SendLine(WireCodec.EncodeChat(_clientId, text));
 
+        public void SendControl(int seat) => SendLine(WireCodec.EncodeControl(seat));
+
         void SendLine(string line)
         {
             if (!_connected)
@@ -159,6 +161,7 @@ namespace Crawler.Net
             public void OnChat(ChatMsg m) => _inner.OnChat(m);
             public void OnLevel(LevelMsg m) => _inner.OnLevel(m);
             public void OnRound(RoundMsg m) => _inner.OnRound(m);
+            public void OnSeats(SeatsMsg m) => _inner.OnSeats(m);
             public void OnStatus(LinkStatus s, string d) => _inner.OnStatus(s, d);
         }
     }
