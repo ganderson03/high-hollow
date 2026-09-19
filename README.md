@@ -4,7 +4,7 @@ A networked co-op puzzle crawler, drawn like a 1970s national park poster. Snow 
 
 This repository is the **Unity client**. The authoritative simulation is a Rust server that is still being built. Until it exists, a mock feed built into the client stands in for it, so the game is fully playable offline.
 
-Current version: **v0.2.0** (see [Versioning](#versioning)).
+Current version: **v0.2.1** (see [Versioning](#versioning)).
 
 ## Requirements
 
@@ -170,9 +170,10 @@ Unity.exe -batchmode -quit -projectPath "<project>" -buildTarget Win64 -buildWin
 
 ## Versioning
 
-The project follows [Semantic Versioning](https://semver.org). While it is below 1.0, new features bump the minor version and fixes bump the patch. Releases are annotated git tags (`v0.1.0`, `v0.2.0`), and the player's version in Player Settings matches the latest tag. Commit messages follow [Conventional Commits](https://www.conventionalcommits.org) (`feat:`, `fix:` and so on), with Added / Changed / Fixed sections in the body.
+The project follows [Semantic Versioning](https://semver.org). While it is below 1.0, new features bump the minor version, and fixes and small additions (documentation, tuning, content tweaks) bump the patch. **Every change that is pushed gets a version**, so the tag list doubles as a changelog. Releases are annotated git tags (`v0.1.0`, `v0.2.1`), and the player's version in Player Settings matches the latest tag. Commit messages follow [Conventional Commits](https://www.conventionalcommits.org) (`feat:`, `fix:` and so on), with Added / Changed / Fixed sections in the body.
 
 | Version | Summary |
 | --- | --- |
+| v0.2.1 | README; level design doc and the full 24-level plan |
 | v0.2.0 | Procedural flat-shaded art, placeholder art style, editor scene builder, pits drop carried keys |
 | v0.1.0 | First playable demo: hub and rooms, title and win posters, mock feed |
