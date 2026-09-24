@@ -4,13 +4,14 @@ A networked two-player co-op puzzle crawler, drawn like a 1970s national park po
 
 This repository is the **Unity client**. The authoritative simulation is a Rust server that is still being built. Until it exists, a mock feed built into the client stands in for it, so the game is fully playable offline.
 
-Current version: **v0.3.0** (see [Versioning](#versioning)).
+Current version: **v0.3.1** (see [Versioning](#versioning)).
 
 ## Requirements
 
-- Unity **6000.6.0f1** (Unity 6) with the Universal Render Pipeline
+- Unity **6000.6.0f1** (Unity 6) with the Universal Render Pipeline. Install that exact version from Unity Hub rather than letting a newer editor upgrade the project: an asset upgrade is one way, and the packages are pinned against this version.
 - Input System package (the project uses the new Input System only)
 - Newtonsoft JSON (`com.unity.nuget.newtonsoft-json`, installed through `Packages/manifest.json`)
+- Nothing else. **Git LFS is not needed** and no plugins, DLLs or imported models are involved: every mesh, texture and material in the game is generated in code at load. The package list is deliberately short, so if a package appears that nothing here imports, it came from a template and can go.
 
 ## Getting started
 
@@ -19,6 +20,20 @@ Current version: **v0.3.0** (see [Versioning](#versioning)).
 3. Press Play, then **Enter** on the title screen to set out.
 
 By default the client runs against the mock feed and needs no server.
+
+### Opening it on another machine
+
+Clone the repository and open the clone. Do not copy `Library/`, `Temp/` or `Builds/` across: they are machine-specific, they are ignored for that reason, and Unity rebuilds `Library/` on the first open, which takes a few minutes.
+
+If the first open fails, the cause is almost always outside the repository:
+
+| Symptom | Cause | Fix |
+| --- | --- | --- |
+| Compile errors, or a package that will not resolve | The editor is not 6000.6.0f1 | Install 6000.6.0f1 in Unity Hub and open with it |
+| A wall of package errors, or the resolve never finishes | No network on the first open, so the registry cannot be reached | Connect and reopen; packages are cached afterwards |
+| A script or texture is a few lines of text starting with `version https://git-lfs` | Something was committed through LFS from a machine that had it installed | Install Git LFS and run `git lfs pull` |
+
+The last row should never happen. `.gitattributes` carries the Unity template's long list of LFS file types, but the `lfs` macro is defined to mark those types binary **without** routing them through LFS, so a clone never needs LFS installed.
 
 ### Bootstrap settings
 
@@ -192,6 +207,7 @@ Unity.exe -batchmode -quit -projectPath "<project>" -buildTarget Win64 -buildWin
 
 - **Domain reload is off** (Enter Play Mode Options). Static fields survive between play sessions while the Unity objects they point at are destroyed, and a destroyed material renders magenta. Any static cache of Unity objects must reset in a `[RuntimeInitializeOnLoadMethod(SubsystemRegistration)]` method, and cache hits must use Unity's own null check, never `??` or `?.`. Test changes with two back-to-back play sessions.
 - **Play mode only advances while the editor has focus**, so scripted checks run from outside the editor can stall at frame 2.
+- **The project settings and package list are part of the repository.** `ProjectSettings/`, `Packages/manifest.json` and `Packages/packages-lock.json` are committed, so a change to the editor's own settings is a change to the project. Installing a package is a commit, and so is letting an editor of a different version rewrite the lock file.
 - **The floor is one unbroken quad.** Nothing below y=0 is visible, and a face exactly on y=0 z-fights with it. Procedural bases sit slightly below zero for that reason.
 
 ## Versioning
@@ -200,6 +216,7 @@ The project follows [Semantic Versioning](https://semver.org). While it is below
 
 | Version | Summary |
 | --- | --- |
+| v0.3.1 | Portability fixes: the Hub bootstrap script and the unused template packages are gone, the LFS macro no longer routes files through LFS, and the README says how to open the project elsewhere |
 | v0.3.0 | Two leopards with Tab switching, the Foothills biome (four levels), trail progression, rectangular levels with a scenery apron, room entrances, door links, the level solver |
 | v0.2.1 | README; level design doc and the full 24-level plan |
 | v0.2.0 | Procedural flat-shaded art, placeholder art style, editor scene builder, pits drop carried keys |
