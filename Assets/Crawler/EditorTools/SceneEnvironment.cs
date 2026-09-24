@@ -48,7 +48,8 @@ namespace Crawler.EditorTools
             ProcArt.ClearCache();
             MeshGen.ClearCache();
 
-            GridSpace.Size = level.Grid;
+            GridSpace.Width = level.Width;
+            GridSpace.Height = level.Height;
             floor.BuildLevel(level);
             BuildProps(world.transform, level);
             int saved = PersistGeneratedAssets(world.transform);
@@ -56,7 +57,7 @@ namespace Crawler.EditorTools
             EditorSceneManager.MarkSceneDirty(world.scene);
             Selection.activeGameObject = world;
             SceneView.FrameLastActiveSceneView();
-            Debug.Log($"[Scene] built '{level.Id}' ({level.Grid}x{level.Grid}); saved {saved} generated assets. " +
+            Debug.Log($"[Scene] built '{level.Id}' ({level.Width}x{level.Height}); saved {saved} generated assets. " +
                       "Delete the World children before a playtest if you do not want the static copy.");
         }
 
@@ -98,10 +99,33 @@ namespace Crawler.EditorTools
             EditorSceneManager.MarkSceneDirty(floor.gameObject.scene);
         }
 
+        const string LevelPref = "Crawler.SceneLevel";
+
+        /// <summary>The level the Scene view shows; remembered between editor sessions.</summary>
+        static string SceneLevelId
+        {
+            get => EditorPrefs.GetString(LevelPref, "hollow");
+            set => EditorPrefs.SetString(LevelPref, value);
+        }
+
+        [MenuItem("Crawler/Next Level in Scene %#n")]
+        static void NextLevel()
+        {
+            var trailPath = Path.Combine(Application.streamingAssetsPath, "levels", "trail.json");
+            if (!File.Exists(trailPath)) { Debug.LogWarning("[Scene] no trail.json"); return; }
+            var trail = TrailCodec.Parse(File.ReadAllText(trailPath));
+            var all = new List<string>();
+            foreach (var b in trail.Biomes) all.AddRange(b.Levels);
+            if (all.Count == 0) return;
+            int i = all.IndexOf(SceneLevelId);
+            SceneLevelId = all[(i + 1) % all.Count];
+            Build();
+        }
+
         static LevelDef LoadLevel(out string error)
         {
             error = null;
-            const string id = "hollow";
+            string id = SceneLevelId;
             var path = Path.Combine(Application.streamingAssetsPath, "levels", id + ".json");
             if (!File.Exists(path)) { error = "no level at " + path; return null; }
             try { return LevelCodec.Parse(File.ReadAllText(path)); }
@@ -118,8 +142,8 @@ namespace Crawler.EditorTools
 
             var scarves = new[] { Palette.Sienna, Palette.Pine, Palette.Ochre };
             int player = 0;
-            for (int y = 0; y < level.Grid; y++)
-            for (int x = 0; x < level.Grid; x++)
+            for (int y = 0; y < level.Height; y++)
+            for (int x = 0; x < level.Width; x++)
             {
                 char t = level.At(x, y);
                 EntityKind kind;

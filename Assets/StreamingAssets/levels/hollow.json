@@ -1,7 +1,9 @@
 {
   "id": "hollow",
   "name": "High Hollow",
-  "grid": 32,
+  "biome": "foothills",
+  "width": 32,
+  "height": 32,
   "rows": [
     "TTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTT",
     "TTTTTTTTTTT##########TTTTTTTTTTT",
@@ -16,17 +18,17 @@
     "T#.......#T#........#T#.k.K...#T",
     "T#...K...#T#......B.#T#.......#T",
     "T#.......#T#........#T#hhhh.hh#T",
-    "T#.......#T#........#T#.......#T",
+    "T#.......#T#...E....#T#.......#T",
     "T####D####T####.#####T#.......#T",
     "T#.......#TTTTT.TTTTTT#h.hhhhh#T",
     "T#.L.....#T####.#####T#.......#T",
     "T#.....H.#T#........#T#.......#T",
     "T#.......#T#........#T#hhhhh.h#T",
     "T#..H....#T#........#T#.......#T",
-    "T#............................#T",
+    "T#......E..............E......#T",
     "T#.......#T#........#T#.S.....#T",
     "T#.......#T#...P....#T#.......#T",
-    "T#########T#.1....2.#T#########T",
+    "T#########T#.1......#T#########T",
     "TTTTTTTTTTT#........#TTTTTTTTTTT",
     "TTTTTTTTTTT####F#####TTTTTTTTTTT",
     "TTTTTTTTTTTTT##.###TTTTTTTTTTTTT",
@@ -37,10 +39,10 @@
     "TTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTT"
   ],
   "regions": [
-    { "name": "Camp",         "subtitle": "gather the three keys",      "rect": [11, 6, 10, 10], "rule": "hub" },
-    { "name": "Lever Hollow", "subtitle": "west  ·  a lever, a door",   "rect": [1, 8, 9, 15],   "rule": "lever" },
-    { "name": "Twin Stones",  "subtitle": "north  ·  it takes two",     "rect": [11, 17, 10, 14], "rule": "plate" },
-    { "name": "Veiled Scree", "subtitle": "east  ·  not all is shown",  "rect": [22, 8, 9, 15],  "rule": "sight" },
-    { "name": "The Summit",   "subtitle": "the gate answers three keys", "rect": [13, 1, 6, 5],  "rule": "goal" }
+    {"name": "Camp", "subtitle": "gather the three keys", "rect": [11, 6, 10, 10], "rule": "hub"},
+    {"name": "Lever Hollow", "subtitle": "west  ·  a lever, a door", "rect": [1, 8, 9, 15], "rule": "lever"},
+    {"name": "Twin Stones", "subtitle": "north  ·  it takes two", "rect": [11, 17, 10, 14], "rule": "plate"},
+    {"name": "Veiled Scree", "subtitle": "east  ·  not all is shown", "rect": [22, 8, 9, 15], "rule": "sight"},
+    {"name": "The Summit", "subtitle": "the gate answers three keys", "rect": [13, 1, 6, 5], "rule": "goal"}
   ]
 }

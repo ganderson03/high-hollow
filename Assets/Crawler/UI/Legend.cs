@@ -44,18 +44,18 @@ namespace Crawler.UI
             text.alignment = TextAnchor.UpperLeft;
             text.text =
                 $"<b>{C(Palette.Ochre, "FIELD GUIDE")}</b>\n" +
-                $"{S(Palette.Sienna, "●")}  you: sienna scarf, gold ring\n" +
-                $"{S(Palette.Pine, "●")}{S(Palette.Ochre, "●")} teammates: pine, ochre scarves\n" +
-                $"{S(Palette.Pine, "■")}  lever: Space beside it, opens its door\n" +
-                $"{S(Palette.Stone, "■")}  plate: holds its door open while stood on\n" +
-                $"{S(Palette.Umber, "■")}  door: opened by its room's lever or plate\n" +
-                $"{S(Palette.Umber, "■")}  summit gate: carry all three keys\n" +
+                $"{S(Palette.Ochre, "◎")}  the leopard you are steering\n" +
+                $"{S(Palette.Sienna, "●")}{S(Palette.Pine, "●")} scarves: sienna and pine leopards\n" +
+                $"{S(Palette.Pine, "■")}  lever: Space beside it, opens a door\n" +
+                $"{S(Palette.Stone, "■")}  plate: holds a door open while stood on\n" +
+                $"{S(Palette.Umber, "■")}  door: opened by a lever or plate\n" +
+                $"{S(Palette.Umber, "■")}  summit gate: carry every key\n" +
                 $"{S(Palette.Ochre, "■")}  key: walk over it to carry it\n" +
-                $"{S(Palette.Boulder, "◉")}  pit: back to camp, carried keys lost\n" +
+                $"{S(Palette.Boulder, "◉")}  pit: back to the room's entrance, your keys lost\n" +
                 $"{S(Palette.Stone, "■")}  sightstone: Space beside it to see true\n" +
-                $"{S(Palette.Sand, "?")}  some pits are hidden; one key is false\n" +
-                $"{S(Palette.Cream, "◆")}  summit: reach it to win\n" +
-                $"\n{C(Palette.Sand, "WASD / arrows move · Space act · Enter chat")}";
+                $"{S(Palette.Sand, "?")}  some pits are hidden; some keys are false\n" +
+                $"{S(Palette.Cream, "◆")}  summit: both leopards, to win\n" +
+                $"\n{C(Palette.Sand, "WASD move · Space act · Tab switch leopard · Enter chat")}";
         }
 
         static string C(Color c, string s) => $"<color=#{ColorUtility.ToHtmlStringRGB(c)}>{s}</color>";

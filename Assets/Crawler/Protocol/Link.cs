@@ -11,6 +11,7 @@ namespace Crawler.Protocol
         void OnChat(ChatMsg msg);
         void OnLevel(LevelMsg msg);
         void OnRound(RoundMsg msg);
+        void OnSeats(SeatsMsg msg);
         void OnStatus(LinkStatus status, string detail);
     }
 
@@ -27,5 +28,8 @@ namespace Crawler.Protocol
 
         void SendInput(InputMsg msg);
         void SendChat(string text);
+
+        /// <summary>Ask to steer another seat this client holds. The server answers with Seats.</summary>
+        void SendControl(int seat);
     }
 }

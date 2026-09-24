@@ -1,10 +1,10 @@
 # High Hollow
 
-A networked co-op puzzle crawler, drawn like a 1970s national park poster. Snow leopards work together to gather three keys across a hub of rooms and reach the summit.
+A networked two-player co-op puzzle crawler, drawn like a 1970s national park poster. A pair of snow leopards works its way up a trail of levels, holding doors open for each other, fetching keys, and reaching each summit together.
 
 This repository is the **Unity client**. The authoritative simulation is a Rust server that is still being built. Until it exists, a mock feed built into the client stands in for it, so the game is fully playable offline.
 
-Current version: **v0.2.1** (see [Versioning](#versioning)).
+Current version: **v0.3.0** (see [Versioning](#versioning)).
 
 ## Requirements
 
@@ -29,7 +29,7 @@ The `Bootstrap` object in the scene holds the switches you are likely to touch:
 | `useMockFeed` | on | Play against the built-in mock instead of a real server |
 | `host`, `port` | `127.0.0.1`, `7777` | Server address when the mock is off |
 | `playerName` | `snep` | Name sent in `hello` |
-| `mockLevelId` | `hollow` | Level the mock loads from `StreamingAssets/levels` |
+| `mockLevelId` | `foothills-1` | Level the mock starts on; the trail continues from there |
 | `artStyle` | Placeholder | `Poster` for the finished look, `Placeholder` for fast testing |
 
 The committed scene uses **Placeholder** art. Switch `artStyle` to **Poster** before a demo or a build.
@@ -40,19 +40,29 @@ The committed scene uses **Placeholder** art. Switch `artStyle` to **Poster** be
 | --- | --- |
 | WASD / arrow keys | Move (the last direction pressed wins) |
 | Space | Interact with an adjacent lever or sightstone |
+| Tab | Switch to your other leopard, when you hold both |
 | Enter | Open chat, send a message |
 
-## How the hollow plays
+## How the trail plays
 
-The level `hollow` is a camp hub with four rooms around it. The rules below are the demo rules, and today they live only in the mock (`Assets/Crawler/Mock/MockFeed.cs`).
+The game is for **two leopards**. With a partner, each player steers one. Solo, or against the mock, one player holds both and presses **Tab** to switch; the leopard left behind stands exactly where it was, which is often the point: an idle leopard holds a plate open for the other.
 
-- **Camp**: the hub where everyone spawns.
-- **Lever Hollow** (west): pull the lever beside the door to open it. One key waits inside.
-- **Twin Stones** (north): a stone plate holds its door open only while someone stands on it. A teammate will hold it for you. One key waits inside.
-- **Veiled Scree** (east): a field of pits, some of them hidden, plus a false key beside the real one. Use the sightstone by the door to see true.
-- **The Summit** (south): the gate opens once all three keys are carried. Reach the summit to win; the round resets shortly after.
+The trail is a run of levels grouped into **biomes**, listed in `levels/trail.json`. Reaching a summit loads the next level. The first biome, **Foothills**, is built:
 
-Falling into a pit sends you back to camp and drops every key you carry back where it was found.
+| Level | Teaches |
+| --- | --- |
+| Trailhead | levers and doors; each lane's lever opens the other lane |
+| Stile Meadow | plates hold a door only while someone stands on them, so the pair takes turns |
+| Cairn Fields | keys and the summit gate, pits, hidden pits, the sightstone and a false key |
+| High Hollow | the finale: a hub with four rooms using all of the above |
+
+Rules that apply everywhere:
+
+- **Both leopards must reach the summit**: one on the marker, the other in the summit's room.
+- **Falling into a pit** sends that leopard back to the entrance of the room it fell in, and every key it carries goes back where it was found. The partner and the room are untouched.
+- **The summit gate** opens once the pair carries every key between them.
+
+The rules live only in the mock today (`Assets/Crawler/Mock`); the full design, including the five biomes still to come, is in [docs/levels-design.md](docs/levels-design.md) and [docs/levels-plan.md](docs/levels-plan.md).
 
 ## Project layout
 
@@ -93,12 +103,19 @@ JSON Lines over TCP: one JSON object per line, discriminated by `t`.
 {"t":"chat","from":0,"text":"on my way"}
 ```
 
-`move` is one of `n`, `s`, `e`, `w`, `none`. Inputs are sent at the replication rate (20 Hz) and logged to the console.
+`move` is one of `n`, `s`, `e`, `w`, `none`. Inputs are sent at the replication rate (20 Hz) and logged to the console. They move whichever leopard the client is steering.
+
+```json
+{"t":"control","seat":1}
+```
+
+A client holding both seats asks to steer the other leopard; the server answers with `seats`.
 
 **Server to client**
 
 ```json
-{"t":"welcome","client_id":0,"grid":32,"tick_hz":60,"replication_hz":20}
+{"t":"welcome","client_id":0,"width":24,"height":9,"tick_hz":60,"replication_hz":20}
+{"t":"seats","yours":[0,1],"active":0}
 {"t":"snapshot","tick":412,"entities":[[15,9,0,0,-1]]}
 {"t":"overlay","tick":412,"hidden":[7],"substituted":[[3,4]],"phantoms":[[26,21,4]]}
 {"t":"chat","from":255,"text":"welcome to High Hollow"}
@@ -106,7 +123,9 @@ JSON Lines over TCP: one JSON object per line, discriminated by `t`.
 {"t":"round","tick":412,"state":"playing"}
 ```
 
-An entity is `[x, y, kind, state, carried_by]`, where `carried_by` is `-1` when nobody carries it. Its index in the array is its id.
+An entity is `[x, y, kind, state, carried_by]`, where `carried_by` is `-1` when nobody carries it, else the seat carrying it. Its index in the array is its id; ids 0 and 1 are the two seats' leopards.
+
+`seats` says which leopards this client controls and which it is steering; it is sent at the start and whenever control changes. Levels are rectangular, so `welcome` carries `width` and `height` (older servers sending a square `grid` are still accepted).
 
 | Kind | Value | `state` |
 | --- | --- | --- |
@@ -123,7 +142,7 @@ Overlay entries are `substituted: [id, look]` and `phantoms: [x, y, look]`, wher
 
 **Not yet agreed with the Rust server.** These are client-side conventions until the server settles them:
 
-- The Nth Player entity belongs to client N.
+- Seat N is the Nth Player entity; the mock always gives its one client both seats.
 - `level` and `round` are client additions to the original protocol.
 - Chat from sender `255` is shown as the server.
 - The overlay's look key was called `sprite` in early notes, from a 2D plan.
@@ -132,19 +151,25 @@ Canonical encoding and xxh3 hash parity with the server are planned, not impleme
 
 ## Levels
 
-Levels are JSON in `Assets/StreamingAssets/levels/{id}.json`: a name, a square ASCII map (rows listed north to south), and named regions with a rule. Level ids are whitelisted to `[a-z0-9_-]{1,32}` because a server may send them.
+Levels are JSON in `Assets/StreamingAssets/levels/{id}.json`: a name, a biome, a rectangular ASCII map (rows listed north to south), named regions with a rule, and optional links. Level ids are whitelisted to `[a-z0-9_-]{1,32}` because a server may send them. The order of play is `levels/trail.json`. Both files are part of the contract with the server.
 
 | Glyph | Meaning | Glyph | Meaning |
 | --- | --- | --- | --- |
 | `.` | floor | `L` | lever |
 | `#` | wall | `B` | plate |
 | `T` | tree | `K` | key |
-| `P` `1` `2` | player spawns | `k` | phantom key (perception only) |
+| `P` `1` | the two leopards' spawns | `k` | phantom key (perception only) |
 | `D` | door | `H` | pit |
 | `F` | summit gate | `h` | hidden pit |
 | `G` | summit | `S` | sightstone |
+| `E` | room entrance, where a fallen leopard returns | | |
 
-Region rules are `hub`, `lever`, `plate`, `sight` and `goal`. A door opens by its region's lever, or by its region's plate in a `plate` region; the summit gate `F` opens when every key is carried.
+A door opens by its **links** if it has any: `"links": [{ "from": [col, row], "to": [col, row] }]`, written as column and row exactly as they read in `rows`, from a lever or plate to a door. A door with no links falls back to its region's rule: its region's plate in a `plate` region, its region's lever otherwise. The summit gate `F` opens when every key is carried.
+
+### Tools
+
+- `python tools/levelcheck.py <level.json>...` validates a level and **solves** it with the same rules as the mock: it reports the shortest winning route and how often control passes between the two leopards on it. Every shipped level must solve.
+- `python tools/build_foothills.py` regenerates the Foothills level files from code, where rooms, pieces and links are placed by coordinate rather than by hand-editing the map.
 
 ## Editor tools
 
@@ -153,6 +178,7 @@ The **Crawler** menu in the editor:
 - **Build Environment in Scene** (Ctrl+Shift+E): builds the level's terrain and a prop for every entity into the open scene, so it can be inspected without entering Play. Generated assets are written to `Assets/Crawler/Generated` so a saved scene keeps them. At runtime the static copy is cleared and rebuilt from the live feed, so it never duplicates.
 - **Clear Environment from Scene**: removes what the builder added.
 - **Art Style > Poster / Placeholder**: switches what the builder produces and rebuilds.
+- **Next Level in Scene** (Ctrl+Shift+N): steps the builder through the trail's levels.
 
 ## Building
 
@@ -170,10 +196,11 @@ Unity.exe -batchmode -quit -projectPath "<project>" -buildTarget Win64 -buildWin
 
 ## Versioning
 
-The project follows [Semantic Versioning](https://semver.org). While it is below 1.0, new features bump the minor version, and fixes and small additions (documentation, tuning, content tweaks) bump the patch. **Every change that is pushed gets a version**, so the tag list doubles as a changelog. Releases are annotated git tags (`v0.1.0`, `v0.2.1`), and the player's version in Player Settings matches the latest tag. Commit messages follow [Conventional Commits](https://www.conventionalcommits.org) (`feat:`, `fix:` and so on), with Added / Changed / Fixed sections in the body.
+The project follows [Semantic Versioning](https://semver.org). While it is below 1.0, new features bump the minor version, and fixes and small additions (documentation, tuning, content tweaks) bump the patch. **Every change that is pushed gets a version**, so the tag list doubles as a changelog. Releases are annotated git tags (`v0.1.0`, `v0.3.0`), and the player's version in Player Settings matches the latest tag. Commit messages follow [Conventional Commits](https://www.conventionalcommits.org) (`feat:`, `fix:` and so on), with Added / Changed / Fixed sections in the body.
 
 | Version | Summary |
 | --- | --- |
+| v0.3.0 | Two leopards with Tab switching, the Foothills biome (four levels), trail progression, rectangular levels with a scenery apron, room entrances, door links, the level solver |
 | v0.2.1 | README; level design doc and the full 24-level plan |
 | v0.2.0 | Procedural flat-shaded art, placeholder art style, editor scene builder, pits drop carried keys |
 | v0.1.0 | First playable demo: hub and rooms, title and win posters, mock feed |

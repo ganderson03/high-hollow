@@ -30,5 +30,21 @@ namespace Crawler.App
                 return null;
             }
         }
+
+        /// <summary>The trail manifest, levels/trail.json. Null (with an error) if it is missing or malformed.</summary>
+        public static TrailDef LoadTrail(out string error)
+        {
+            error = null;
+            var path = Path.Combine(Application.streamingAssetsPath, "levels", "trail.json");
+            try
+            {
+                return TrailCodec.Parse(File.ReadAllText(path));
+            }
+            catch (Exception e)
+            {
+                error = "trail: " + e.Message;
+                return null;
+            }
+        }
     }
 }

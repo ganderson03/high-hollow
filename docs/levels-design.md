@@ -1,6 +1,6 @@
 # Levels and mechanics: design
 
-Status: **draft, decisions folded in**. Nothing here is built yet. It covers the level trail, one bespoke mechanic per level, the framework they need, and every protocol change they imply, so the Rust server can be planned against the same document.
+Status: **decisions folded in; partly built**. As of v0.3.0 the client and mock have two seats with switching, minor failures with room entrances, door links, rectangular levels with an apron, trail progression, and the core module split. Major failures, the vote reset, checkpoints, disconnect handling and every non-core mechanic are not built yet. It covers the level trail, one bespoke mechanic per level, the framework they need, and every protocol change they imply, so the Rust server can be planned against the same document.
 
 ## Decisions
 
@@ -9,6 +9,7 @@ Status: **draft, decisions folded in**. Nothing here is built yet. It covers the
 | Structure | **Biomes.** Six biomes of **three levels plus a finale** each (possibly up to five later). A level takes 3 to 5 minutes at a standard pace; each finale runs longer. The level-by-level plan is in [levels-plan.md](levels-plan.md). |
 | Finale checkpoints | **Yes, one per finale.** A major failure after it restores the checkpoint, not the level start. See [Checkpoints](#checkpoints). |
 | Player count | **Exactly two leopards.** Every level is designed for a pair. |
+| Winning | **Both leopards reach the summit**: one on the marker, the other in the summit's room. Otherwise a plate-holder could stay behind while the partner wins alone. |
 | Failure | **Two grades.** A minor failure (a pit, a collapsed ledge) resets only the leopard who fell; a major failure (chasm, open water, torrent) restarts the whole level. See [Failure](#failure). |
 | Soft-locks | **A vote reset.** Either player proposes restarting the level; it happens only if the other agrees. See [Vote reset](#vote-reset). |
 | Two-player pushes | **A timing window, not a same-tick read.** Each push counts for 1.5 s; length to be tuned in playtest. See [Heavy slabs](#heavy-slabs). |
@@ -332,6 +333,7 @@ A snowfield in a squall, riddled with hidden crevasses.
 | `biome` in level files | biomes | level format |
 | Checkpoint (12), `state` 1 = lit | finales | new kind |
 | `mechanics` list in level files | framework | level format |
+| `links` in level files: lever or plate to door, as `[col, row]` in map coordinates | all levels | level format (built in v0.3.0) |
 | Rectangular maps; `E` room entrance glyph | level size, failure | level format |
 | Ledge (8), `state` 0/1/2 | Talus | new kind |
 | Boulder (9), `state` shape + strain | Rockfall | new kind |

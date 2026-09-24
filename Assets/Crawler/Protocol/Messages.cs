@@ -34,9 +34,21 @@ namespace Crawler.Protocol
     public sealed class Welcome
     {
         public byte ClientId;
-        public int Grid;
+        public int Width;   // level size in cells; levels are rectangular
+        public int Height;
         public int TickHz;
         public int ReplicationHz;
+    }
+
+    /// <summary>
+    /// Which leopards this client controls, and which one it is steering. Server -> client,
+    /// whenever control changes. A client holding both seats switches between them with a
+    /// Control message; the idle leopard stands still.
+    /// </summary>
+    public sealed class SeatsMsg
+    {
+        public int[] Yours;
+        public int Active;
     }
 
     /// <summary>Authoritative world state. Index in Entities is the entity id.</summary>

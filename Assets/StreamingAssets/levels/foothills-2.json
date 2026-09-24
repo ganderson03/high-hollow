@@ -1,0 +1,33 @@
+{
+  "id": "foothills-2",
+  "name": "Stile Meadow",
+  "biome": "foothills",
+  "width": 30,
+  "height": 11,
+  "rows": [
+    "TTTTTTTTTTTTTTTTTTTTTTTTTTTTTT",
+    "T##############TTTTTTTTTTTTTTT",
+    "T#.......#....#TTTTTTTT######T",
+    "T#....B..#..B.##########....#T",
+    "T#.......#....##B##B####....#T",
+    "T#.P.....D.......D..D.....G.#T",
+    "T#.1.....#....####B##B##....#T",
+    "T#.......#....##########....#T",
+    "T#.......#....#TTTTTTTT######T",
+    "T##############TTTTTTTTTTTTTTT",
+    "TTTTTTTTTTTTTTTTTTTTTTTTTTTTTT"
+  ],
+  "regions": [
+    {"name": "The Stile", "subtitle": "a plate holds its door only while someone stands on it", "rect": [2, 2, 12, 7], "rule": "plate"},
+    {"name": "The Ratchet", "subtitle": "one holds, one goes, then swap", "rect": [15, 4, 8, 3], "rule": "plate"},
+    {"name": "Meadow Top", "subtitle": "both leopards to the summit", "rect": [24, 3, 4, 5], "rule": "goal"}
+  ],
+  "links": [
+    {"from": [6, 3], "to": [9, 5]},
+    {"from": [12, 3], "to": [9, 5]},
+    {"from": [16, 4], "to": [17, 5]},
+    {"from": [18, 6], "to": [17, 5]},
+    {"from": [19, 4], "to": [20, 5]},
+    {"from": [21, 6], "to": [20, 5]}
+  ]
+}

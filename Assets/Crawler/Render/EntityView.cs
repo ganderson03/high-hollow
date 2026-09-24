@@ -90,22 +90,29 @@ namespace Crawler.Render
             _glideOffset = Vector3.zero;
         }
 
-        GameObject _localRing;
+        GameObject _ring;
+        int _marker; // 0 none, 1 the leopard you are steering, 2 your other leopard
 
-        /// <summary>Ember ring under the local player's feet. Perception only.</summary>
-        public void SetLocal(bool isLocal)
+        /// <summary>
+        /// Ring under a leopard you control: gold for the one you are steering, dim for the one
+        /// standing idle when you hold both. Perception only.
+        /// </summary>
+        public void SetMarker(int marker)
         {
-            if (isLocal && _localRing == null)
-            {
-                EnsureInit();
-                _localRing = new GameObject("LocalRing");
-                _localRing.transform.SetParent(_visual, false);
-                _localRing.transform.localPosition = new Vector3(0, 0.012f, 0);
-                _localRing.transform.localScale = new Vector3(1.0f, 0.01f, 1.0f);
-                _localRing.AddComponent<MeshFilter>().sharedMesh = ProcArt.Mesh(PrimitiveType.Cylinder);
-                _localRing.AddComponent<MeshRenderer>().sharedMaterial = ProcArt.Glow(Palette.Ochre, 0.2f);
-            }
-            if (_localRing != null) _localRing.SetActive(isLocal);
+            if (marker == _marker && (_ring != null || marker == 0)) return;
+            _marker = marker;
+            if (_ring != null) { Destroy(_ring); _ring = null; }
+            if (marker == 0) return;
+
+            EnsureInit();
+            _ring = new GameObject(marker == 1 ? "ActiveRing" : "IdleRing");
+            _ring.transform.SetParent(_visual, false);
+            _ring.transform.localPosition = new Vector3(0, 0.012f, 0);
+            _ring.transform.localScale = marker == 1 ? new Vector3(1.0f, 0.01f, 1.0f) : new Vector3(0.8f, 0.01f, 0.8f);
+            _ring.AddComponent<MeshFilter>().sharedMesh = ProcArt.Mesh(PrimitiveType.Cylinder);
+            _ring.AddComponent<MeshRenderer>().sharedMaterial = marker == 1
+                ? ProcArt.Glow(Palette.Ochre, 0.2f)
+                : ProcArt.Solid(Color.Lerp(Palette.Ochre, Palette.Night, 0.55f));
         }
 
         /// <summary>Carried things float above the carrier's head, fanned out by id. Visual only.</summary>
