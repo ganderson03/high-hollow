@@ -27,6 +27,7 @@ namespace Crawler.Render
         public void Build(int size)
         {
             _w = _h = grid = size;
+            WorldMap.Set(null);
             Clear();
             BuildFloor(ProcArt.FloorTiles(grid, texelsPerCell), apron: 0);
         }
@@ -35,6 +36,7 @@ namespace Crawler.Render
         {
             _w = level.Width;
             _h = level.Height;
+            WorldMap.Set(level); // doors ask it which way their wall runs
             Clear();
             BuildFloor(ProcArt.LevelFloor(level, texelsPerCell), apronCells);
 
@@ -73,7 +75,7 @@ namespace Crawler.Render
             for (int x = 0; x < _w; x++)
             {
                 char t = level.At(x, y);
-                if (t == '#') DryStone(walls, x, y, stone, lichen, WallAxis(level, x, y));
+                if (t == '#') DryStone(walls, x, y, stone, lichen, WorldMap.AxisAt(level, x, y));
                 else if (t == 'T') { if (ProcArt.Hash01(x, y, 3) < treeDensity) Pine(trees, x, y, needles, bark, snow); }
                 else if (t == '.') Scatter(scatter, x, y, stone, tuft, level.RegionAt(x, y) >= 0);
                 // Cells holding an entity (pits, doors, keys) get no scatter: a pebble sitting
@@ -107,16 +109,6 @@ namespace Crawler.Render
             go.transform.localScale = scale;
             go.AddComponent<MeshFilter>().sharedMesh = mesh;
             go.AddComponent<MeshRenderer>().sharedMaterial = mat;
-        }
-
-        /// <summary>Which way this run of wall travels, so the stones can be laid along it.</summary>
-        static float WallAxis(LevelDef level, int x, int y)
-        {
-            bool ew = level.At(x - 1, y) == '#' || level.At(x + 1, y) == '#';
-            bool ns = level.At(x, y - 1) == '#' || level.At(x, y + 1) == '#';
-            if (ew && !ns) return 0f;
-            if (ns && !ew) return 90f;
-            return ProcArt.Hash01(x, y, 99) < 0.5f ? 0f : 90f; // corner or pillar: either reads fine
         }
 
         /// <summary>

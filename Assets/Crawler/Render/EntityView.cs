@@ -22,6 +22,8 @@ namespace Crawler.Render
         Vector3 _lift;
         Color? _accent;
         Transform _tail;
+        int _cellX = int.MinValue, _cellY = int.MinValue;
+        int _builtX = int.MinValue, _builtY = int.MinValue; // the cell the current look was built for
         float _yaw = 210f; // default: face the camera
         LookAnim _animMode;
         float _animTarget, _anim01;
@@ -59,6 +61,8 @@ namespace Crawler.Render
                 _glideOffset = Vector3.zero;
             transform.localPosition = cell;
 
+            _cellX = s.X;
+            _cellY = s.Y;
             SetLook(look);
             _animTarget = s.State != 0 ? 1f : 0f;
             SetCarried(s.CarriedBy >= 0);
@@ -79,10 +83,16 @@ namespace Crawler.Render
 
         void SetLook(int look)
         {
-            if (look == Look) return;
+            // A door is turned to the wall it stands in, so its model depends on its cell. Views are
+            // reused when the next level loads, and a door id there can sit in a wall running the
+            // other way; rebuild it then. Doors never move within a level, so this costs nothing in play.
+            bool doorMoved = look == (int)EntityKind.Door && (_cellX != _builtX || _cellY != _builtY);
+            if (look == Look && !doorMoved) return;
             Look = look;
+            _builtX = _cellX;
+            _builtY = _cellY;
             if (_lookGo != null) Destroy(_lookGo);
-            _lookGo = Looks.Build(look, _visual, _accent);
+            _lookGo = Looks.Build(look, _visual, _accent, _cellX, _cellY);
             _anim = _lookGo.transform.Find("Anim");
             _tail = _lookGo.transform.Find("Anim/Tail");
             _animMode = Looks.AnimFor(look);
