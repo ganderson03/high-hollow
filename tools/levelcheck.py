@@ -153,7 +153,10 @@ def analyse(path, max_states=3_000_000):
                     return True
         return False
 
-    def solve(seats):
+    def won_solo(npos, s):
+        return any(npos[s] == (g[2], g[3]) for g in goals)
+
+    def solve(seats, win=None):
         start = (p0, p1, 0, tuple([-1] * len(keys)))
         prev = {start: None}
         q = deque([start])
@@ -189,7 +192,7 @@ def analyse(path, max_states=3_000_000):
                             nc[key_idx[i]] = s
                     nst = (npos[0], npos[1], lv, tuple(nc))
                     step = {(1, 0): "e", (-1, 0): "w", (0, 1): "n", (0, -1): "s"}[(dx, dy)]
-                    if won(npos):
+                    if win(npos, s) if win else won(npos):
                         actions = [(s, step)]
                         cur = st
                         while prev[cur] is not None:
@@ -206,12 +209,15 @@ def analyse(path, max_states=3_000_000):
         return None, len(prev)
 
     duo, duo_states = solve((0, 1))
-    return d, w, h, errs, duo, duo_states
+    # Can one leopard do the whole level's work on its own? If it can, nothing in the
+    # level forces cooperation, whatever the hand-off count on the two-leopard route says.
+    solo = [solve((s,), won_solo)[0] for s in (0, 1)]
+    return d, w, h, errs, duo, duo_states, solo
 
 
 if __name__ == "__main__":
     for path in sys.argv[1:]:
-        d, w, h, errs, duo, states = analyse(path)
+        d, w, h, errs, duo, states, solo = analyse(path)
         print(f"== {d['id']} '{d['name']}' {w}x{h}")
         for e in dict.fromkeys(errs):
             print("  ERROR", e)
@@ -221,3 +227,9 @@ if __name__ == "__main__":
             actions, switches, _ = duo
             print(f"  solvable: shortest {actions} actions (~{actions * 0.15:.0f}s of pure input), {states} states searched")
             print(f"  control passes between leopards {switches} times on that route")
+        for s, r in enumerate(solo):
+            if r is not None:
+                print(f"  NOT COOPERATIVE: leopard {s} alone reaches the summit in {r[0]} actions, "
+                      f"doing every lever and key itself; the partner only has to arrive")
+        if duo is not None and all(r is None for r in solo):
+            print("  cooperative: neither leopard can finish the level by itself")

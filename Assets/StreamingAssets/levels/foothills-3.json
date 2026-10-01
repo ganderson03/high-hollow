@@ -17,7 +17,7 @@
     "T#....#...H...H....#khh.#T",
     "T#.K..D...H.K.H....#hhh.#T",
     "T#....#....H.H.....#hh..#T",
-    "T#....#L..........S#hh.h#T",
+    "T#....#B..........S#hh.h#T",
     "T######.............E...#T",
     "TTTTTT#.....P1.....#....#T",
     "TTTTTT#.....E......######T",
@@ -26,7 +26,7 @@
   ],
   "regions": [
     {"name": "Cairn Field", "subtitle": "carry every key to the summit gate", "rect": [7, 2, 12, 10], "rule": "hub"},
-    {"name": "West Nook", "subtitle": "a lever, a door", "rect": [2, 5, 4, 5], "rule": "lever"},
+    {"name": "West Nook", "subtitle": "one holds the plate, the other fetches", "rect": [2, 5, 4, 5], "rule": "plate"},
     {"name": "East Nook", "subtitle": "not all is shown  ·  Space beside the sightstone", "rect": [20, 3, 4, 8], "rule": "sight"},
     {"name": "Cairn Summit", "subtitle": "the gate answers three keys", "rect": [10, 13, 6, 4], "rule": "goal"}
   ],

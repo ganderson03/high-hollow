@@ -84,20 +84,27 @@ def trailhead():
     m.link((6, 3), (7, 4))
     m.region("The Trailhead", "Space beside a lever pulls it", "lever", 2, 2, 6, 6)
 
-    # Room B: two lanes. Each lane's lever opens the OTHER lane's door.
+    # Room B: two lanes, and the first thing in the game that one leopard cannot do alone.
+    #
+    # A plate in the north alcove holds the SOUTH door open, and it only holds while
+    # somebody stands on it. So one leopard waits on the plate while the other walks the
+    # south lane. On the far side is a lever that opens the NORTH door for good, which is
+    # the only way the leopard on the plate ever gets out. Two latching levers were the
+    # first try and they do not work: a lever stays pulled, so a single leopard just
+    # pulled both and walked through at its leisure.
     m.room(7, 1, 17, 7)
     m.put(7, 4, "D")                      # shared wall with A
     m.fill(9, 2, 15, 6, "#")              # solid block, then carve the lanes
     m.fill(9, 3, 15, 3, ".")              # north lane
     m.fill(9, 5, 15, 5, ".")              # south lane
-    m.put(10, 2, "L")                     # north lane lever, in an alcove
-    m.put(10, 6, "L")                     # south lane lever, in an alcove
+    m.put(10, 2, "B")                     # plate in the north alcove: held, not latched
     m.put(13, 3, "D")                     # north lane door
     m.put(13, 5, "D")                     # south lane door
-    m.link((10, 2), (13, 5))              # north lever opens the south door
-    m.link((10, 6), (13, 3))              # south lever opens the north door
+    m.put(16, 6, "L")                     # far-side lever, reachable only past a door
+    m.link((10, 2), (13, 5))              # the plate holds the south door open
+    m.link((16, 6), (13, 3))              # the far lever opens the north door for good
     m.put(17, 4, ".")                     # gap into the summit
-    m.region("Split Lanes", "each lane's lever opens the other lane  ·  Tab switches leopard", "lever", 8, 2, 16, 6)
+    m.region("Split Lanes", "one stands on the plate, the other opens the way back  ·  Tab switches leopard", "lever", 8, 2, 16, 6)
 
     # Room C: the summit. Both leopards need to be here.
     m.room(17, 1, 22, 7)
@@ -161,13 +168,16 @@ def cairn_fields():
     m.put(12, 10, "K")                    # key two, reached through the gap at (12, 11)
     m.region("Cairn Field", "carry every key to the summit gate", "hub", 7, 6, 18, 15)
 
-    # West nook: a lever door, key one.
+    # West nook: key one, behind a door somebody has to hold open from outside.
+    # A lever here would latch, which would let one leopard fetch all three keys itself
+    # and leave the partner as a passenger. A plate cannot be banked: the holder stays put
+    # in the field while the other walks in, takes the key and walks back out.
     m.room(1, 7, 6, 13)
     m.put(6, 10, "D")
-    m.put(7, 12, "L")                     # lever in the field, beside the nook door
+    m.put(7, 12, "B")                     # plate in the field, beside the nook door
     m.link((7, 12), (6, 10))
     m.put(3, 10, "K")
-    m.region("West Nook", "a lever, a door", "lever", 2, 8, 5, 12)
+    m.region("West Nook", "one holds the plate, the other fetches", "plate", 2, 8, 5, 12)
 
     # East nook: hidden pits, a false key in the open, the real key tucked behind.
     m.room(19, 6, 24, 15)

@@ -53,14 +53,18 @@ Warm meadow and dry-stone walls: the look the game has today. No new rules and n
 
 | Level | Size | Shortest route | Hand-offs between leopards |
 | --- | --- | --- | --- |
-| 1-1 Trailhead | 24×9 | 40 actions | 3 |
+| 1-1 Trailhead | 24×9 | 41 actions | 5 |
 | 1-2 Stile Meadow | 30×11 | 61 actions | 13 |
-| 1-3 Cairn Fields | 26×18 | 78 actions | 3 |
+| 1-3 Cairn Fields | 26×18 | 87 actions | 3 |
 | 1-F High Hollow | 32×32 | 178 actions | 3 |
 
 Those routes are short in raw input (under half a minute each), so real clear times will come from thinking, not walking. They need timing in playtest against the 3 to 5 minute target; the early levels may run short, which is acceptable for a tutorial.
 
-**As built, 1-1 differs from the plan below**: rather than leapfrogging two doors in one corridor, the Split Lanes room gives each leopard its own lane whose lever opens the other lane's door.
+All four are also **cooperative**: the solver confirms that neither leopard can finish any of them by itself. Two of them failed that check at first, which is recorded under [Forced cooperation](levels-design.md) and is worth repeating here, because it decides how every later biome has to be built: **a latching lever can never force cooperation**. A lever stays pulled, a key can be carried without limit and walking is reversible, so whatever a pair does in turns, one leopard can do alone while the other watches. Only a held mechanism makes two players necessary, which today means the plate.
+
+**As built, 1-1 differs from the plan below.** Rather than leapfrogging two doors in one corridor, the Split Lanes room has two parallel lanes. A plate in the north alcove holds the south door open only while somebody stands on it, so one leopard waits while the other walks the south lane; a lever on the far side, which nothing can reach without passing a door, then opens the north door for good and lets the holder out. The first version gave each lane its own latching lever, which one leopard simply pulled both of.
+
+**1-3 differs too**: the west nook's key is behind a plate-held door rather than a lever-held one, for the same reason.
 
 ### 1-1 Trailhead
 

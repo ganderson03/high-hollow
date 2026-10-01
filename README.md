@@ -4,7 +4,7 @@ A networked two-player co-op puzzle crawler, drawn like a 1970s national park po
 
 This repository is the **Unity client**. The authoritative simulation is a Rust server that is still being built. Until it exists, a mock feed built into the client stands in for it, so the game is fully playable offline.
 
-Current version: **v0.5.0** (see [Versioning](#versioning)).
+Current version: **v0.6.0** (see [Versioning](#versioning)).
 
 ## Requirements
 
@@ -66,9 +66,9 @@ The trail is a run of levels grouped into **biomes**, listed in `levels/trail.js
 
 | Level | Teaches |
 | --- | --- |
-| Trailhead | levers and doors; each lane's lever opens the other lane |
+| Trailhead | levers and doors, then the first thing one leopard cannot do alone: a held plate and a lever on the far side |
 | Stile Meadow | plates hold a door only while someone stands on them, so the pair takes turns |
-| Cairn Fields | keys and the summit gate, pits, hidden pits, the sightstone and a false key |
+| Cairn Fields | keys and the summit gate, pits, hidden pits, the sightstone and a false key; one key sits behind a door the partner has to hold |
 | High Hollow | the finale: a hub with four rooms using all of the above |
 
 Rules that apply everywhere:
@@ -185,7 +185,9 @@ A door opens by its **links** if it has any: `"links": [{ "from": [col, row], "t
 
 ### Tools
 
-- `python tools/levelcheck.py <level.json>...` validates a level and **solves** it with the same rules as the mock: it reports the shortest winning route and how often control passes between the two leopards on it. Every shipped level must solve.
+- `python tools/levelcheck.py <level.json>...` validates a level and **solves** it with the same rules as the mock: it reports the shortest winning route, how often control passes between the two leopards on it, and whether the level is **cooperative**. Every shipped level must solve.
+
+  The cooperation check runs the search again with one leopard frozen at its spawn. If the other can still reach the summit on its own, having pulled every lever and picked up every key itself, the level is reported as `NOT COOPERATIVE`: nothing in it needs two players, and the only thing the partner contributes is standing at the summit at the end. A high hand-off count does not rule this out, because it only describes one shortest route and not what is possible.
 - `python tools/build_foothills.py` regenerates the Foothills level files from code, where rooms, pieces and links are placed by coordinate rather than by hand-editing the map.
 
 ## Editor tools
@@ -229,6 +231,7 @@ The project follows [Semantic Versioning](https://semver.org). While it is below
 
 | Version | Summary |
 | --- | --- |
+| v0.6.0 | The solver checks whether a level actually needs two leopards, and the two Foothills levels that did not now do |
 | v0.5.0 | Doors face the wall they stand in; the placeholder leopard is built from boxes into a real silhouette with a wagging tail |
 | v0.4.0 | The Scene view and Play share Bootstrap's level and art style; a `Handmade` root whose contents survive a rebuild |
 | v0.3.1 | Portability fixes: the Hub bootstrap script and the unused template packages are gone, the LFS macro no longer routes files through LFS, and the README says how to open the project elsewhere |

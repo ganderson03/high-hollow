@@ -9,6 +9,7 @@ Status: **decisions folded in; partly built**. As of v0.3.0 the client and mock 
 | Structure | **Biomes.** Six biomes of **three levels plus a finale** each (possibly up to five later). A level takes 3 to 5 minutes at a standard pace; each finale runs longer. The level-by-level plan is in [levels-plan.md](levels-plan.md). |
 | Finale checkpoints | **Yes, one per finale.** A major failure after it restores the checkpoint, not the level start. See [Checkpoints](#checkpoints). |
 | Player count | **Exactly two leopards.** Every level is designed for a pair. |
+| Forced cooperation | A level is only cooperative if **neither leopard can finish it alone**, which `tools/levelcheck.py` now checks. Of the mechanics built so far only the **plate** forces it, because a plate holds a door just while someone stands on it. A lever latches, a key can be carried without limit and walking is reversible, so anything a pair can do in turns, one leopard can do by itself. Levels built out of levers and keys alone are single-player levels with a passenger. |
 | Winning | **Both leopards reach the summit**: one on the marker, the other in the summit's room. Otherwise a plate-holder could stay behind while the partner wins alone. |
 | Failure | **Two grades.** A minor failure (a pit, a collapsed ledge) resets only the leopard who fell; a major failure (chasm, open water, torrent) restarts the whole level. See [Failure](#failure). |
 | Soft-locks | **A vote reset.** Either player proposes restarting the level; it happens only if the other agrees. See [Vote reset](#vote-reset). |
