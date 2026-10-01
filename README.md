@@ -6,7 +6,7 @@ A networked two-player co-op puzzle crawler, drawn like a 1970s national park po
 
 This repository is the **Unity client**. The authoritative simulation is a Rust server that is still being built. Until it exists, a mock feed built into the client stands in for it, so the game is fully playable offline.
 
-Current version: **v0.6.1** (see [Versioning](#versioning)).
+Current version: **v0.6.2** (see [Versioning](#versioning)).
 
 ## Requirements
 
@@ -191,7 +191,7 @@ A door opens by its **links** if it has any: `"links": [{ "from": [col, row], "t
 
   The cooperation check runs the search again with one leopard frozen at its spawn. If the other can still reach the summit on its own, having pulled every lever and picked up every key itself, the level is reported as `NOT COOPERATIVE`: nothing in it needs two players, and the only thing the partner contributes is standing at the summit at the end. A high hand-off count does not rule this out, because it only describes one shortest route and not what is possible.
 - `python tools/build_foothills.py` regenerates the Foothills level files from code, where rooms, pieces and links are placed by coordinate rather than by hand-editing the map.
-- `python tools/render_models.py` draws the model sheet at the top of this file, from the same box list and palette the game uses, for slides and documentation. It needs Pillow and does not need Unity.
+- `python tools/render_models.py` draws the model sheet at the top of this file, from the same box list and palette the game uses. It writes two files, one on the poster background and one with a transparent background for slides, and it needs Pillow but not Unity.
 
 ## Editor tools
 
@@ -234,6 +234,7 @@ The project follows [Semantic Versioning](https://semver.org). While it is below
 
 | Version | Summary |
 | --- | --- |
+| v0.6.2 | The model sheet is just the two leopards and their names, plus a transparent version |
 | v0.6.1 | The scarf is wide enough to tell the seats apart, and a renderer that draws the model sheet |
 | v0.6.0 | The solver checks whether a level actually needs two leopards, and the two Foothills levels that did not now do |
 | v0.5.0 | Doors face the wall they stand in; the placeholder leopard is built from boxes into a real silhouette with a wagging tail |

@@ -6,7 +6,8 @@ face, backfaces culled, painter's algorithm. The box list is a copy and nothing 
 it to the C#, so it has to be edited in step with Looks.PlaceholderLeopard.
 
 The game camera looks down at 58 degrees, which turns a low animal into a totem pole, so
-the portrait uses a lower three-quarter angle. The small inset shows the game's own angle.
+the sheet uses a lower three-quarter angle. Two files are written: one on the poster
+background and one with a transparent background, for dropping onto a slide of any colour.
 """
 import math, os
 from PIL import Image, ImageDraw, ImageFont
@@ -14,7 +15,7 @@ from PIL import Image, ImageDraw, ImageFont
 OUT = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "docs", "images")
 FONTS = "C:\\Windows\\Fonts"
 SS = 3
-W, H = 1920, 1080
+W, H = 1600, 900
 
 
 def hex_rgb(v):
@@ -129,55 +130,38 @@ def font(name, size):
     return ImageFont.truetype(os.path.join(FONTS, name), size)
 
 
-def main():
-    os.makedirs(OUT, exist_ok=True)
-    img = Image.new("RGB", (W * SS, H * SS), NIGHT)
+def sheet(transparent):
+    bg = (0, 0, 0, 0) if transparent else NIGHT + (255,)
+    img = Image.new("RGBA", (W * SS, H * SS), bg)
     d = ImageDraw.Draw(img)
 
-    ground = lerp(NIGHT, PINE, 0.5)
-    horizon = int(H * 0.66)
-    d.rectangle([0, horizon * SS, W * SS, H * SS], fill=ground)
-    d.rectangle([0, horizon * SS, W * SS, (horizon + 3) * SS], fill=SIENNA)
+    portrait = basis(26, 38)
+    base = int(H * 0.74) * SS
 
-    portrait = basis(26, 38)       # readable three-quarter
-    game = basis(58, 30)           # CameraFramer's own angle
-
-    base = (horizon + 18) * SS
-    for accent, ox in ((SIENNA, 0.29), (PINE, 0.71)):
+    for accent, ox in ((SIENNA, 0.27), (PINE, 0.73)):
         cx = int(W * ox) * SS
-        d.ellipse([cx - 300 * SS, base - 42 * SS, cx + 300 * SS, base + 30 * SS],
-                  fill=lerp(ground, NIGHT, 0.45))
-        draw(d, project(leopard(accent), 210, portrait), cx, base, 620 * SS, 430 * SS)
-
-    # Inset: the same model at the angle the game camera actually uses.
-    ix = int(W * 0.5) * SS
-    d.ellipse([ix - 110 * SS, base - 30 * SS, ix + 110 * SS, base + 12 * SS],
-              fill=lerp(ground, NIGHT, 0.45))
-    draw(d, project(leopard(SIENNA), 210, game), ix, base, 230 * SS, 230 * SS)
+        if not transparent:        # a shadow needs a floor to fall on
+            d.ellipse([cx - 285 * SS, base - 40 * SS, cx + 285 * SS, base + 28 * SS],
+                      fill=lerp(NIGHT, PINE, 0.22) + (255,))
+        draw(d, project(leopard(accent), 210, portrait), cx, base, 660 * SS, 470 * SS)
 
     img = img.resize((W, H), Image.LANCZOS)
     d = ImageDraw.Draw(img)
+    name = font("georgia.ttf", 46)
+    for text, ox in (("sienna", 0.27), ("pine", 0.73)):
+        d.text((int(W * ox), int(H * 0.87)), text, font=name, fill=CREAM + (255,), anchor="mm")
 
-    d.text((W // 2, 86), "THE TWO LEOPARDS", font=font("georgiab.ttf", 62), fill=CREAM, anchor="mm")
-    d.text((W // 2, 140), "one player steers both and presses Tab  ·  two players take one each",
-           font=font("georgia.ttf", 28), fill=STONE, anchor="mm")
+    return img
 
-    for name, swatch, accent, ox in (("SEAT 1", "sienna  #A33B2A", SIENNA, 0.30),
-                                     ("SEAT 2", "pine  #4F5B3A", PINE, 0.70)):
-        x = int(W * ox)
-        d.text((x, 800), name, font=font("framd.ttf", 32), fill=CREAM, anchor="mm")
-        d.line([(x - 120, 828), (x + 120, 828)], fill=accent, width=4)
-        d.text((x, 860), swatch, font=font("georgia.ttf", 23), fill=STONE, anchor="mm")
 
-    d.text((W // 2, 800), "the game camera's own angle", font=font("georgia.ttf", 21),
-           fill=lerp(STONE, NIGHT, 0.2), anchor="mm")
-    d.text((W // 2, 1028),
-           "the scarf is the only difference  ·  placeholder art, twenty boxes built in code at load",
-           font=font("georgia.ttf", 23), fill=lerp(STONE, NIGHT, 0.35), anchor="mm")
-
-    path = os.path.join(OUT, "player-models.png")
-    img.save(path)
-    print("wrote", path, img.size)
+def main():
+    os.makedirs(OUT, exist_ok=True)
+    for transparent, fname in ((False, "player-models.png"),
+                               (True, "player-models-transparent.png")):
+        img = sheet(transparent)
+        path = os.path.join(OUT, fname)
+        (img.convert("RGB") if not transparent else img).save(path)
+        print("wrote", os.path.normpath(path), img.size)
 
 
 main()
