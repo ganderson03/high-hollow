@@ -309,11 +309,19 @@ namespace Crawler.Render
         /// </summary>
         static readonly string[] Generated = { "Tiles", "Plinth", "Apron", "Walls", "Trees", "Scatter", "ScenePreview" };
 
+        /// <summary>
+        /// Hand-placed set dressing belongs under a child with this name. Nothing generates it
+        /// and nothing clears it, so whatever is parked there survives into a play session.
+        /// Never add this to <see cref="Generated"/>.
+        /// </summary>
+        public const string HandmadeRoot = "Handmade";
+
         void Clear()
         {
             for (int i = transform.childCount - 1; i >= 0; i--)
             {
                 var go = transform.GetChild(i).gameObject;
+                if (go.name == HandmadeRoot) continue; // hand-placed work is never ours to delete
                 if (System.Array.IndexOf(Generated, go.name) < 0) continue;
                 // Immediate on purpose: a rebuild recreates these same names right away, and a
                 // deferred Destroy would leave the old copy standing for the rest of the frame.

@@ -4,7 +4,7 @@ A networked two-player co-op puzzle crawler, drawn like a 1970s national park po
 
 This repository is the **Unity client**. The authoritative simulation is a Rust server that is still being built. Until it exists, a mock feed built into the client stands in for it, so the game is fully playable offline.
 
-Current version: **v0.3.1** (see [Versioning](#versioning)).
+Current version: **v0.4.0** (see [Versioning](#versioning)).
 
 ## Requirements
 
@@ -192,8 +192,19 @@ The **Crawler** menu in the editor:
 
 - **Build Environment in Scene** (Ctrl+Shift+E): builds the level's terrain and a prop for every entity into the open scene, so it can be inspected without entering Play. Generated assets are written to `Assets/Crawler/Generated` so a saved scene keeps them. At runtime the static copy is cleared and rebuilt from the live feed, so it never duplicates.
 - **Clear Environment from Scene**: removes what the builder added.
-- **Art Style > Poster / Placeholder**: switches what the builder produces and rebuilds.
-- **Next Level in Scene** (Ctrl+Shift+N): steps the builder through the trail's levels.
+- **Art Style > Poster / Placeholder**: switches the style and rebuilds.
+- **Next Level in Scene** (Ctrl+Shift+N): steps through the trail's levels.
+- **Create Handmade Root**: makes the one child the builder will not touch. See below.
+
+Both the level and the style come off the **Bootstrap component in the open scene**, the same two fields a play session reads, so the Scene view always shows what pressing Play would give. The menu writes to them. A scene with no Bootstrap in it falls back to an editor preference.
+
+### What survives a play session
+
+Pressing Play regenerates the world from the level file: `GridFloor` clears its own roots (`Tiles`, `Plinth`, `Apron`, `Walls`, `Trees`, `Scatter`, `ScenePreview`) and builds them again. **Anything you move, recolor or delete among those is discarded**, because the level file and the generators are the source of truth, not the scene.
+
+The exception is a child named **`Handmade`**. Nothing generates it and nothing clears it, so its children appear in a play session exactly as you left them in the Scene view. Use it for one-off set dressing. Build Environment also moves any generated asset that a handmade prop references out of `Assets/Crawler/Generated` and into `Assets/Crawler/Handmade` before it wipes the generated folder, which keeps those references alive (a move preserves the asset's GUID).
+
+So, to change the world: edit the level JSON for layout, the generators in `Assets/Crawler/Render` for how a thing looks, and the `Handmade` root for a single prop that exists nowhere else.
 
 ## Building
 
@@ -216,6 +227,7 @@ The project follows [Semantic Versioning](https://semver.org). While it is below
 
 | Version | Summary |
 | --- | --- |
+| v0.4.0 | The Scene view and Play share Bootstrap's level and art style; a `Handmade` root whose contents survive a rebuild |
 | v0.3.1 | Portability fixes: the Hub bootstrap script and the unused template packages are gone, the LFS macro no longer routes files through LFS, and the README says how to open the project elsewhere |
 | v0.3.0 | Two leopards with Tab switching, the Foothills biome (four levels), trail progression, rectangular levels with a scenery apron, room entrances, door links, the level solver |
 | v0.2.1 | README; level design doc and the full 24-level plan |

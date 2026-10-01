@@ -35,6 +35,13 @@ namespace Crawler.App
         [SerializeField] ChatPanel chat;
         [SerializeField] StatusBadge status;
 
+        /// <summary>
+        /// The level and the art style a play session uses. The editor's scene builder reads
+        /// and writes these same two fields, so the Scene view cannot disagree with Play.
+        /// </summary>
+        public string MockLevelId { get => mockLevelId; set => mockLevelId = value; }
+        public ArtStyle Style { get => artStyle; set => artStyle = value; }
+
         IServerLink _link;
         int _localClient = -1;
         LinkStatus _lastStatus = LinkStatus.Idle;

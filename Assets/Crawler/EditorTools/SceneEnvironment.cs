@@ -1,5 +1,6 @@
 using System.Collections.Generic;
 using System.IO;
+using Crawler.App;
 using Crawler.Protocol;
 using Crawler.Render;
 using UnityEditor;
@@ -16,6 +17,7 @@ namespace Crawler.EditorTools
     static class SceneEnvironment
     {
         const string GenDir = "Assets/Crawler/Generated";
+        const string HandDir = "Assets/Crawler/Handmade";
         const string PreviewName = "ScenePreview";
         static readonly string[] Built = { "Tiles", "Plinth", "Walls", "Trees", "Scatter", PreviewName };
 
@@ -39,6 +41,13 @@ namespace Crawler.EditorTools
             }
             var world = floor.gameObject;
 
+            // Build in whatever style a play session would use, so the two cannot disagree.
+            Art.Style = SceneStyle;
+
+            // Hand-placed props reference assets in the folder about to be deleted. Move those
+            // out of the way first: a move keeps the asset's GUID, so the references survive.
+            RescueHandmadeAssets(world.transform);
+
             // Clear last run's generated assets FIRST, then drop the art caches that point at
             // them: deleting those assets destroys the very objects the caches hold, and a
             // destroyed material renders magenta.
@@ -57,8 +66,9 @@ namespace Crawler.EditorTools
             EditorSceneManager.MarkSceneDirty(world.scene);
             Selection.activeGameObject = world;
             SceneView.FrameLastActiveSceneView();
-            Debug.Log($"[Scene] built '{level.Id}' ({level.Width}x{level.Height}); saved {saved} generated assets. " +
-                      "Delete the World children before a playtest if you do not want the static copy.");
+            Debug.Log($"[Scene] built '{level.Id}' ({level.Width}x{level.Height}) in {Art.Style}; " +
+                      $"saved {saved} generated assets. Play rebuilds all of this from the level file, so " +
+                      $"anything placed by hand belongs under a '{GridFloor.HandmadeRoot}' child to survive.");
         }
 
         [MenuItem("Crawler/Art Style/Poster")]
@@ -68,10 +78,10 @@ namespace Crawler.EditorTools
         static void StylePlaceholder() => SetStyle(ArtStyle.Placeholder);
 
         [MenuItem("Crawler/Art Style/Poster", true)]
-        static bool StylePosterCheck() { Menu.SetChecked("Crawler/Art Style/Poster", Art.Style == ArtStyle.Poster); return true; }
+        static bool StylePosterCheck() { Menu.SetChecked("Crawler/Art Style/Poster", SceneStyle == ArtStyle.Poster); return true; }
 
         [MenuItem("Crawler/Art Style/Placeholder", true)]
-        static bool StylePlaceholderCheck() { Menu.SetChecked("Crawler/Art Style/Placeholder", Art.Simple); return true; }
+        static bool StylePlaceholderCheck() { Menu.SetChecked("Crawler/Art Style/Placeholder", SceneStyle == ArtStyle.Placeholder); return true; }
 
         /// <summary>
         /// Switches the style and rebuilds. Note this only changes what the editor builds into
@@ -79,6 +89,13 @@ namespace Crawler.EditorTools
         /// </summary>
         static void SetStyle(ArtStyle style)
         {
+            var boot = Object.FindFirstObjectByType<Bootstrap>();
+            if (boot != null)
+            {
+                Undo.RecordObject(boot, "Crawler art style");
+                boot.Style = style;
+                EditorUtility.SetDirty(boot);
+            }
             Art.Style = style;
             Build();
         }
@@ -101,11 +118,35 @@ namespace Crawler.EditorTools
 
         const string LevelPref = "Crawler.SceneLevel";
 
-        /// <summary>The level the Scene view shows; remembered between editor sessions.</summary>
+        /// <summary>
+        /// The Bootstrap in the open scene owns both switches, so the Scene view always shows the
+        /// level and the style that pressing Play would give. A scene without one (a scratch scene
+        /// holding nothing but a GridFloor) falls back to an editor preference.
+        /// </summary>
         static string SceneLevelId
         {
-            get => EditorPrefs.GetString(LevelPref, "hollow");
-            set => EditorPrefs.SetString(LevelPref, value);
+            get
+            {
+                var boot = Object.FindFirstObjectByType<Bootstrap>();
+                return boot != null ? boot.MockLevelId : EditorPrefs.GetString(LevelPref, "hollow");
+            }
+            set
+            {
+                var boot = Object.FindFirstObjectByType<Bootstrap>();
+                if (boot == null) { EditorPrefs.SetString(LevelPref, value); return; }
+                Undo.RecordObject(boot, "Crawler scene level");
+                boot.MockLevelId = value;
+                EditorUtility.SetDirty(boot);
+            }
+        }
+
+        static ArtStyle SceneStyle
+        {
+            get
+            {
+                var boot = Object.FindFirstObjectByType<Bootstrap>();
+                return boot != null ? boot.Style : Art.Style;
+            }
         }
 
         [MenuItem("Crawler/Next Level in Scene %#n")]
@@ -120,6 +161,67 @@ namespace Crawler.EditorTools
             int i = all.IndexOf(SceneLevelId);
             SceneLevelId = all[(i + 1) % all.Count];
             Build();
+        }
+
+        [MenuItem("Crawler/Create Handmade Root")]
+        static void CreateHandmadeRoot()
+        {
+            var floor = Object.FindFirstObjectByType<GridFloor>();
+            if (floor == null)
+            {
+                EditorUtility.DisplayDialog("Crawler", "no GridFloor in the scene", "ok");
+                return;
+            }
+            var root = floor.transform.Find(GridFloor.HandmadeRoot);
+            if (root == null)
+            {
+                var go = new GameObject(GridFloor.HandmadeRoot);
+                Undo.RegisterCreatedObjectUndo(go, "Create handmade root");
+                go.transform.SetParent(floor.transform, false);
+                root = go.transform;
+                EditorSceneManager.MarkSceneDirty(floor.gameObject.scene);
+            }
+            Selection.activeGameObject = root.gameObject;
+            Debug.Log($"[Scene] '{GridFloor.HandmadeRoot}' is yours: the builder never writes to it and a " +
+                      "rebuild never clears it, so its children appear in a play session exactly as they sit.");
+        }
+
+        /// <summary>
+        /// A rebuild deletes the whole Generated folder, which would strand any hand-placed prop
+        /// pointing into it. Moving those assets to a folder of their own keeps their GUIDs, so
+        /// every reference still resolves and nothing turns magenta.
+        /// </summary>
+        static void RescueHandmadeAssets(Transform world)
+        {
+            var hand = world.Find(GridFloor.HandmadeRoot);
+            if (hand == null) return;
+
+            var used = new List<Object>();
+            foreach (var mf in hand.GetComponentsInChildren<MeshFilter>(true)) used.Add(mf.sharedMesh);
+            foreach (var r in hand.GetComponentsInChildren<MeshRenderer>(true))
+            {
+                used.Add(r.sharedMaterial);
+                if (r.sharedMaterial != null) used.Add(r.sharedMaterial.mainTexture);
+            }
+
+            int moved = 0;
+            foreach (var o in used)
+            {
+                if (o == null) continue;
+                var path = AssetDatabase.GetAssetPath(o);
+                if (string.IsNullOrEmpty(path) || !path.StartsWith(GenDir + "/")) continue;
+
+                if (!AssetDatabase.IsValidFolder(HandDir)) AssetDatabase.CreateFolder("Assets/Crawler", "Handmade");
+                var dest = AssetDatabase.GenerateUniqueAssetPath(HandDir + path.Substring(GenDir.Length));
+                var err = AssetDatabase.MoveAsset(path, dest);
+                if (string.IsNullOrEmpty(err)) moved++;
+                else Debug.LogWarning($"[Scene] could not keep {path}: {err}");
+            }
+            if (moved > 0)
+            {
+                AssetDatabase.SaveAssets();
+                Debug.Log($"[Scene] moved {moved} asset(s) used by '{GridFloor.HandmadeRoot}' into {HandDir}.");
+            }
         }
 
         static LevelDef LoadLevel(out string error)
@@ -185,6 +287,7 @@ namespace Crawler.EditorTools
             // Procedural meshes live only in memory too, and a saved scene would lose them.
             foreach (var mf in root.GetComponentsInChildren<MeshFilter>(true))
             {
+                if (UnderHandmade(mf.transform)) continue;
                 var mesh = mf.sharedMesh;
                 if (mesh == null || AssetDatabase.Contains(mesh)) continue; // built-in primitives are already assets
                 if (meshes.TryGetValue(mesh.name, out var shared)) { mf.sharedMesh = shared; continue; }
@@ -195,6 +298,7 @@ namespace Crawler.EditorTools
 
             foreach (var r in root.GetComponentsInChildren<MeshRenderer>(true))
             {
+                if (UnderHandmade(r.transform)) continue;
                 var mat = r.sharedMaterial;
                 if (mat == null) continue;
 
@@ -222,6 +326,15 @@ namespace Crawler.EditorTools
             }
             if (saved > 0) AssetDatabase.SaveAssets();
             return saved;
+        }
+
+        /// <summary>True for anything parented under the hand-placed root, which the builder
+        /// treats as none of its business.</summary>
+        static bool UnderHandmade(Transform t)
+        {
+            for (var p = t; p != null; p = p.parent)
+                if (p.name == GridFloor.HandmadeRoot) return true;
+            return false;
         }
 
         static string Safe(string name, string fallback)
