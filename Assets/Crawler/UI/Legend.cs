@@ -5,15 +5,18 @@ using UnityEngine.UI;
 namespace Crawler.UI
 {
     /// <summary>
-    /// Top-right key: what each piece is and what it does, plus the controls. Static text.
+    /// Top-right key: a swatch and a name for each piece, plus the controls. Static text.
     ///
-    /// The rules described here are the demo rules, which today live only in MockFeed. If
-    /// the server's rules change, this text has to change with them. Swatch colors follow
-    /// the dominant color of each look and hold for both art styles.
+    /// Names only. A lever explains itself, and a wall of sentences in the corner gets read
+    /// once and then ignored. The two lines at the foot stay because they cannot be guessed
+    /// by looking: that both leopards have to arrive, and that a pit costs the keys you are
+    /// carrying. Those are the demo rules and today they live only in the mock, so if the
+    /// server's rules change this text has to change with them. Swatch colors follow the
+    /// dominant color of each look and hold for both art styles.
     /// </summary>
     public sealed class Legend : MonoBehaviour
     {
-        const float Width = 300f;
+        const float Width = 212f;
 
         void Awake()
         {
@@ -44,18 +47,18 @@ namespace Crawler.UI
             text.alignment = TextAnchor.UpperLeft;
             text.text =
                 $"<b>{C(Palette.Ochre, "FIELD GUIDE")}</b>\n" +
-                $"{S(Palette.Ochre, "◎")}  the leopard you are steering\n" +
-                $"{S(Palette.Sienna, "●")}{S(Palette.Pine, "●")} scarves: sienna and pine leopards\n" +
-                $"{S(Palette.Pine, "■")}  lever: Space beside it, opens a door\n" +
-                $"{S(Palette.Stone, "■")}  plate: holds a door open while stood on\n" +
-                $"{S(Palette.Umber, "■")}  door: opened by a lever or plate\n" +
-                $"{S(Palette.Umber, "■")}  summit gate: carry every key\n" +
-                $"{S(Palette.Ochre, "■")}  key: walk over it to carry it\n" +
-                $"{S(Palette.Boulder, "◉")}  pit: back to the room's entrance, your keys lost\n" +
-                $"{S(Palette.Stone, "■")}  sightstone: Space beside it to see true\n" +
-                $"{S(Palette.Sand, "?")}  some pits are hidden; some keys are false\n" +
-                $"{S(Palette.Cream, "◆")}  summit: both leopards, to win\n" +
-                $"\n{C(Palette.Sand, "WASD move · Space act · Tab switch leopard · Enter chat")}";
+                $"{S(Palette.Ochre, "◎")}  yours\n" +
+                $"{S(Palette.Sienna, "●")}{S(Palette.Pine, "●")} sienna · pine\n" +
+                $"{S(Palette.Pine, "■")}  lever\n" +
+                $"{S(Palette.Stone, "■")}  plate\n" +
+                $"{S(Palette.Umber, "■")}  door\n" +
+                $"{S(Palette.Umber, "■")}  summit gate\n" +
+                $"{S(Palette.Ochre, "■")}  key\n" +
+                $"{S(Palette.Boulder, "◉")}  pit\n" +
+                $"{S(Palette.Stone, "■")}  sightstone\n" +
+                $"{S(Palette.Cream, "◆")}  summit\n" +
+                $"\n{C(Palette.Sand, "both leopards reach the summit\na pit costs the keys you carry")}\n" +
+                $"\n{C(Palette.Sand, "WASD move · Space act\nTab switch · Enter chat")}";
         }
 
         static string C(Color c, string s) => $"<color=#{ColorUtility.ToHtmlStringRGB(c)}>{s}</color>";
