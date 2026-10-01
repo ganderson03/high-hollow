@@ -268,7 +268,7 @@ namespace Crawler.EditorTools
                 var holder = new GameObject($"{kind}_{x}_{y}").transform;
                 holder.SetParent(root, false);
                 holder.localPosition = GridSpace.CellToWorld(x, y);
-                Looks.Build(Looks.ForKind(kind), holder, accent);
+                Looks.Build(Looks.ForKind(kind), holder, accent, x, y);
             }
         }
 

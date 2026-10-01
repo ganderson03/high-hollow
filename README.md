@@ -4,7 +4,7 @@ A networked two-player co-op puzzle crawler, drawn like a 1970s national park po
 
 This repository is the **Unity client**. The authoritative simulation is a Rust server that is still being built. Until it exists, a mock feed built into the client stands in for it, so the game is fully playable offline.
 
-Current version: **v0.4.0** (see [Versioning](#versioning)).
+Current version: **v0.5.0** (see [Versioning](#versioning)).
 
 ## Requirements
 
@@ -179,6 +179,8 @@ Levels are JSON in `Assets/StreamingAssets/levels/{id}.json`: a name, a biome, a
 | `G` | summit | `S` | sightstone |
 | `E` | room entrance, where a fallen leopard returns | | |
 
+A door takes its facing from the wall it stands in: walls to its east and west and the panel runs east to west, walls to its north and south and it turns a quarter turn. A door with no wall beside it at all has nothing to line up with and falls back to a fixed facing, so put doors in walls.
+
 A door opens by its **links** if it has any: `"links": [{ "from": [col, row], "to": [col, row] }]`, written as column and row exactly as they read in `rows`, from a lever or plate to a door. A door with no links falls back to its region's rule: its region's plate in a `plate` region, its region's lever otherwise. The summit gate `F` opens when every key is carried.
 
 ### Tools
@@ -227,6 +229,7 @@ The project follows [Semantic Versioning](https://semver.org). While it is below
 
 | Version | Summary |
 | --- | --- |
+| v0.5.0 | Doors face the wall they stand in; the placeholder leopard is built from boxes into a real silhouette with a wagging tail |
 | v0.4.0 | The Scene view and Play share Bootstrap's level and art style; a `Handmade` root whose contents survive a rebuild |
 | v0.3.1 | Portability fixes: the Hub bootstrap script and the unused template packages are gone, the LFS macro no longer routes files through LFS, and the README says how to open the project elsewhere |
 | v0.3.0 | Two leopards with Tab switching, the Foothills biome (four levels), trail progression, rectangular levels with a scenery apron, room entrances, door links, the level solver |
