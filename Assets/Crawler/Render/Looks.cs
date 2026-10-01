@@ -353,8 +353,10 @@ namespace Crawler.Render
 
             // Neck and head. The scarf sits on the neck, as it does on the poster model.
             Block(anim, fur, new Vector3(0, 0.27f, 0.2f), new Vector3(0.14f, 0.16f, 0.14f));
+            // Wider than the chest and clear of the chin on purpose: the scarf is the only
+            // thing telling the two seats apart, and tucked against the neck it disappeared.
             if (accent.HasValue)
-                Block(anim, accent.Value, new Vector3(0, 0.3f, 0.19f), new Vector3(0.21f, 0.07f, 0.18f));
+                Block(anim, accent.Value, new Vector3(0, 0.3f, 0.17f), new Vector3(0.3f, 0.1f, 0.2f));
 
             Block(anim, fur, new Vector3(0, 0.4f, 0.29f), new Vector3(0.21f, 0.17f, 0.2f));
             Block(anim, cream, new Vector3(0, 0.37f, 0.4f), new Vector3(0.12f, 0.08f, 0.1f));
