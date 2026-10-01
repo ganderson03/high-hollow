@@ -11,27 +11,31 @@ from PIL import ImageDraw
 
 import levelcheck
 from boxrender import (NIGHT, SIENNA, EMBER, CREAM, SAND, OCHRE, PINE, UMBER, STONE,
-                       MOSS, GROUT, PIT, BOULDER, NEEDLE, SS,
+                       HEATHER, MOSS, GROUT, PIT, BOULDER, NEEDLE, SS,
                        canvas, finish, font, lerp, out_dir)
 
 LEVELS = os.path.join(os.path.dirname(os.path.abspath(__file__)),
                       "..", "Assets", "StreamingAssets", "levels")
 
-# glyph -> (fill, inset fraction). None means draw the floor only.
+# glyph -> (fill, inset fraction, outline). Every piece is given a hue of its own and an
+# outline, because the floor is a green checker and anything green or unlined vanishes
+# into it. The in-game colours are not all usable here: a lever is pine green in the
+# world, where it stands up off the floor and reads fine, and invisible from above.
+SPAWNS = {"P": SIENNA, "1": lerp(PINE, CREAM, 0.45), "2": OCHRE}
 CELL = {
-    "#": (lerp(BOULDER, NIGHT, 0.66), 0.0),
-    "T": (NEEDLE, 0.12),
-    "D": (UMBER, 0.06),
-    "F": (lerp(UMBER, OCHRE, 0.45), 0.06),
-    "L": (PINE, 0.26),
-    "B": (STONE, 0.16),
-    "K": (OCHRE, 0.3),
-    "k": (lerp(OCHRE, MOSS, 0.55), 0.3),
-    "H": (PIT, 0.1),
-    "h": (lerp(PIT, MOSS, 0.55), 0.1),
-    "S": (STONE, 0.28),
-    "G": (CREAM, 0.22),
-    "E": (lerp(MOSS, CREAM, 0.12), 0.34),
+    "#": (lerp(BOULDER, NIGHT, 0.66), 0.0, None),
+    "T": (lerp(NEEDLE, NIGHT, 0.25), 0.12, None),
+    "D": (UMBER, 0.04, NIGHT),
+    "F": (EMBER, 0.04, NIGHT),
+    "L": (HEATHER, 0.24, NIGHT),
+    "B": (SAND, 0.14, NIGHT),
+    "K": (OCHRE, 0.26, NIGHT),
+    "k": (lerp(OCHRE, STONE, 0.55), 0.26, NIGHT),
+    "H": (PIT, 0.08, SAND),
+    "h": (lerp(PIT, SAND, 0.22), 0.2, SAND),
+    "S": (STONE, 0.24, CREAM),
+    "G": (CREAM, 0.18, EMBER),
+    "E": (lerp(MOSS, CREAM, 0.3), 0.36, None),
 }
 
 
@@ -52,42 +56,44 @@ def render(level_id, with_route=True, with_name=False):
     W, H = w * cell + margin * 2, h * cell + margin * 2 + (46 if with_name else 0)
     img, d = canvas(W, H, False)
 
-    def rect(x, y, inset, fill):
+    def rect(x, y, inset, fill, outline=None):
         a = inset * cell
         d.rectangle([((margin + x * cell + a)) * SS, ((margin + y * cell + a)) * SS,
                      ((margin + (x + 1) * cell - a)) * SS, ((margin + (y + 1) * cell - a)) * SS],
-                    fill=fill + (255,))
+                    fill=fill + (255,),
+                    outline=None if outline is None else outline + (255,),
+                    width=0 if outline is None else max(2, cell // 16) * SS)
+
+    def disc(x, y, r, fill, outline):
+        cx = (margin + x * cell + cell / 2) * SS
+        cy = (margin + y * cell + cell / 2) * SS
+        d.ellipse([cx - r * SS, cy - r * SS, cx + r * SS, cy + r * SS],
+                  fill=fill + (255,), outline=outline + (255,), width=3 * SS)
 
     # Floor first, as a quiet checker so the grid is legible without drawing lines.
     for y in range(h):
         for x in range(w):
             g = at(x, y)
             if g == "T":
-                rect(x, y, 0, lerp(NIGHT, NEEDLE, 0.45))
+                rect(x, y, 0, lerp(NIGHT, NEEDLE, 0.4))
             elif g == "#":
-                rect(x, y, 0, lerp(NIGHT, NEEDLE, 0.45))
+                rect(x, y, 0, lerp(NIGHT, NEEDLE, 0.4))
             else:
                 # A quiet checker, so the grid reads without drawing lines over it.
                 rect(x, y, 0, MOSS if (x + y) % 2 == 0 else lerp(MOSS, GROUT, 0.6))
 
-    for y in range(h):
-        for x in range(w):
-            g = at(x, y)
-            if g in CELL:
-                fill, inset = CELL[g]
-                rect(x, y, inset, fill)
+    def centre(c):
+        # levelcheck stores tiles at (x, h - 1 - row): its y counts north from the south
+        # edge, while rows and this picture run north to south. Flip, or the route comes
+        # out mirrored and walks through walls.
+        row = h - 1 - c[1]
+        return ((margin + c[0] * cell + cell / 2) * SS, (margin + row * cell + cell / 2) * SS)
 
-    # The route, one line per leopard, drawn over the map.
+    # The route runs UNDER the pieces: drawn last it covers the keys and levers it is
+    # there to explain.
+    ends = []
     if with_route and duo:
-        actions, _switches, acts, states = duo[0], duo[1], duo[2], duo[3]
-
-        def centre(c):
-            # levelcheck stores tiles at (x, h - 1 - row): its y counts north from the south
-            # edge, while rows and this picture run north to south. Flip, or the route comes
-            # out mirrored and walks through walls.
-            row = h - 1 - c[1]
-            return ((margin + c[0] * cell + cell / 2) * SS, (margin + row * cell + cell / 2) * SS)
-
+        acts, states = duo[2], duo[3]
         for seat, colour in ((0, SIENNA), (1, lerp(PINE, CREAM, 0.45))):
             pts = [centre(st[seat]) for st in states]
             thin = [pts[0]]
@@ -98,11 +104,28 @@ def render(level_id, with_route=True, with_name=False):
                 # A dark halo under each line, so pine does not sink into the grass.
                 d.line(thin, fill=NIGHT + (255,), width=13 * SS, joint="curve")
                 d.line(thin, fill=colour + (255,), width=7 * SS, joint="curve")
-            for p, r in ((thin[0], 12), (thin[-1], 15)):
-                d.ellipse([p[0] - r * SS, p[1] - r * SS, p[0] + r * SS, p[1] + r * SS],
-                          fill=colour + (255,), outline=NIGHT + (255,), width=3 * SS)
+            ends.append((thin[-1], colour))
 
-        # Where control passes from one leopard to the other.
+    for y in range(h):
+        for x in range(w):
+            g = at(x, y)
+            if g in CELL:
+                fill, inset, outline = CELL[g]
+                rect(x, y, inset, fill, outline)
+
+    # Where each leopard starts, in its own scarf colour, and where it ends up.
+    for y in range(h):
+        for x in range(w):
+            if at(x, y) in SPAWNS:
+                disc(x, y, cell * 0.26, SPAWNS[at(x, y)], NIGHT)
+    for (px, py), colour in ends:
+        r = 15 * SS
+        d.ellipse([px - r, py - r, px + r, py + r], fill=colour + (255,),
+                  outline=NIGHT + (255,), width=3 * SS)
+
+    # Where control passes from one leopard to the other.
+    if with_route and duo:
+        acts, states = duo[2], duo[3]
         for i in range(len(acts) - 1):
             if acts[i][0] != acts[i + 1][0]:
                 cx, cy = centre(states[min(i + 1, len(states) - 1)][acts[i][0]])

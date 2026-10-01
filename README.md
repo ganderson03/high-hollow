@@ -6,7 +6,7 @@ A networked two-player co-op puzzle crawler, drawn like a 1970s national park po
 
 This repository is the **Unity client**. The authoritative simulation is a Rust server that is still being built. Until it exists, a mock feed built into the client stands in for it, so the game is fully playable offline.
 
-Current version: **v0.8.0** (see [Versioning](#versioning)).
+Current version: **v0.8.1** (see [Versioning](#versioning)).
 
 ## Requirements
 
@@ -239,6 +239,7 @@ The project follows [Semantic Versioning](https://semver.org). While it is below
 
 | Version | Summary |
 | --- | --- |
+| v0.8.1 | Level maps mark both spawns and give every piece a colour the floor does not already use |
 | v0.8.0 | Documentation renders: a prop sheet, and level maps drawn with the solver's route on them |
 | v0.7.1 | The field guide is swatches and names, without the sentences |
 | v0.7.0 | The placeholder leopard is rebuilt: cat proportions instead of ferret, and the scarf rings the neck |
