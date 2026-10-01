@@ -6,7 +6,7 @@ A networked two-player co-op puzzle crawler, drawn like a 1970s national park po
 
 This repository is the **Unity client**. The authoritative simulation is a Rust server that is still being built. Until it exists, a mock feed built into the client stands in for it, so the game is fully playable offline.
 
-Current version: **v0.7.1** (see [Versioning](#versioning)).
+Current version: **v0.8.0** (see [Versioning](#versioning)).
 
 ## Requirements
 
@@ -65,6 +65,8 @@ The committed scene uses **Placeholder** art. Switch `artStyle` to **Poster** be
 The game is for **two leopards**. With a partner, each player steers one. Solo, or against the mock, one player holds both and presses **Tab** to switch; the leopard left behind stands exactly where it was, which is often the point: an idle leopard holds a plate open for the other.
 
 The trail is a run of levels grouped into **biomes**, listed in `levels/trail.json`. Reaching a summit loads the next level. The first biome, **Foothills**, is built:
+
+![The shortest cooperative route through Trailhead](docs/images/foothills-1-route.png)
 
 | Level | Teaches |
 | --- | --- |
@@ -192,6 +194,9 @@ A door opens by its **links** if it has any: `"links": [{ "from": [col, row], "t
   The cooperation check runs the search again with one leopard frozen at its spawn. If the other can still reach the summit on its own, having pulled every lever and picked up every key itself, the level is reported as `NOT COOPERATIVE`: nothing in it needs two players, and the only thing the partner contributes is standing at the summit at the end. A high hand-off count does not rule this out, because it only describes one shortest route and not what is possible.
 - `python tools/build_foothills.py` regenerates the Foothills level files from code, where rooms, pieces and links are placed by coordinate rather than by hand-editing the map.
 - `python tools/render_models.py` draws the model sheet at the top of this file, from the same box list and palette the game uses. It writes two files, one on the poster background and one with a transparent background for slides, and it needs Pillow but not Unity.
+- `python tools/render_props.py` does the same for the props.
+- `python tools/render_level.py <level-id> [--no-route] [--name]` draws a level from above. By default it solves the level first and lays the shortest cooperative route over the map, one line per leopard, with a ring wherever control passes between them. The picture cannot disagree with the game: if a route is drawn, the solver proved it wins.
+- All three share `tools/boxrender.py`, which holds the palette, the scene's own sun direction and the orthographic box renderer.
 
 ## Editor tools
 
@@ -234,6 +239,7 @@ The project follows [Semantic Versioning](https://semver.org). While it is below
 
 | Version | Summary |
 | --- | --- |
+| v0.8.0 | Documentation renders: a prop sheet, and level maps drawn with the solver's route on them |
 | v0.7.1 | The field guide is swatches and names, without the sentences |
 | v0.7.0 | The placeholder leopard is rebuilt: cat proportions instead of ferret, and the scarf rings the neck |
 | v0.6.3 | The model sheet is lit properly: its cube faces were each taking another face's normal |

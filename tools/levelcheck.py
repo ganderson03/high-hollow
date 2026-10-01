@@ -199,8 +199,14 @@ def analyse(path, max_states=3_000_000):
                             cur, who, act = prev[cur]
                             actions.append((who, act))
                         actions.reverse()
+                        # The cells both leopards stood in at each step, for drawing the route.
+                        path, cur = [(npos[0], npos[1])], st
+                        while cur is not None:
+                            path.append((cur[0], cur[1]))
+                            cur = prev[cur][0] if prev[cur] is not None else None
+                        path.reverse()
                         switches = sum(1 for a, b in zip(actions, actions[1:]) if a[0] != b[0])
-                        return (len(actions), switches, actions), len(prev)
+                        return (len(actions), switches, actions, path), len(prev)
                     if nst not in prev:
                         prev[nst] = (st, s, step)
                         q.append(nst)
@@ -224,7 +230,7 @@ if __name__ == "__main__":
         if duo is None:
             print(f"  UNSOLVABLE (searched {states} states)")
         else:
-            actions, switches, _ = duo
+            actions, switches = duo[0], duo[1]
             print(f"  solvable: shortest {actions} actions (~{actions * 0.15:.0f}s of pure input), {states} states searched")
             print(f"  control passes between leopards {switches} times on that route")
         for s, r in enumerate(solo):
