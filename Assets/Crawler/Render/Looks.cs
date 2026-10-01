@@ -341,39 +341,41 @@ namespace Crawler.Render
             var cream = Palette.Cream;
             var paw = Color.Lerp(Palette.Sand, Palette.Umber, 0.25f);
 
-            // Body: long and low, haunch behind, pale belly.
-            Block(anim, fur, new Vector3(0, 0.17f, -0.02f), new Vector3(0.28f, 0.2f, 0.42f));
-            Block(anim, fur, new Vector3(0, 0.175f, -0.24f), new Vector3(0.29f, 0.22f, 0.22f));
-            Block(anim, fur, new Vector3(0, 0.19f, 0.16f), new Vector3(0.27f, 0.2f, 0.2f));
-            Block(anim, cream, new Vector3(0, 0.105f, 0.03f), new Vector3(0.17f, 0.07f, 0.34f));
+            // Trunk: a deep chest and a heavy haunch over a short barrel. The first
+            // version was one long even tube on thin legs, which read as a ferret.
+            Block(anim, fur, new Vector3(0f, 0.28f, -0.17f), new Vector3(0.29f, 0.23f, 0.17f)); // haunch
+            Block(anim, fur, new Vector3(0f, 0.27f, -0.01f), new Vector3(0.26f, 0.21f, 0.27f)); // barrel
+            Block(anim, fur, new Vector3(0f, 0.28f, 0.145f), new Vector3(0.27f, 0.22f, 0.15f)); // chest
+            Block(anim, cream, new Vector3(0f, 0.19f, -0.01f), new Vector3(0.18f, 0.06f, 0.24f)); // belly
 
-            foreach (var leg in new[] { new Vector2(-0.095f, 0.17f), new Vector2(0.095f, 0.17f),
-                                        new Vector2(-0.095f, -0.18f), new Vector2(0.095f, -0.18f) })
-                Block(anim, paw, new Vector3(leg.x, 0.08f, leg.y), new Vector3(0.07f, 0.16f, 0.07f));
+            // Thick legs, set well under the body.
+            foreach (var leg in new[] { new Vector2(-0.09f, 0.13f), new Vector2(0.09f, 0.13f), new Vector2(-0.095f, -0.145f), new Vector2(0.095f, -0.145f) })
+                Block(anim, paw, new Vector3(leg.x, 0.08f, leg.y), new Vector3(0.085f, 0.16f, 0.085f));
 
-            // Neck and head. The scarf sits on the neck, as it does on the poster model.
-            Block(anim, fur, new Vector3(0, 0.27f, 0.2f), new Vector3(0.14f, 0.16f, 0.14f));
-            // Wider than the chest and clear of the chin on purpose: the scarf is the only
-            // thing telling the two seats apart, and tucked against the neck it disappeared.
+            // A neck tall enough to wear something, then the head above it.
+            Block(anim, fur, new Vector3(0f, 0.375f, 0.2f), new Vector3(0.155f, 0.145f, 0.145f)); // neck
+
+            // The scarf rings the neck and tucks under the chin: wider than the head so
+            // it shows from every side, since it is the only thing telling the seats apart.
             if (accent.HasValue)
-                Block(anim, accent.Value, new Vector3(0, 0.3f, 0.17f), new Vector3(0.3f, 0.1f, 0.2f));
+                Block(anim, accent.Value, new Vector3(0f, 0.387f, 0.2f), new Vector3(0.24f, 0.085f, 0.2f));
 
-            Block(anim, fur, new Vector3(0, 0.4f, 0.29f), new Vector3(0.21f, 0.17f, 0.2f));
-            Block(anim, cream, new Vector3(0, 0.37f, 0.4f), new Vector3(0.12f, 0.08f, 0.1f));
-            Block(anim, Palette.Umber, new Vector3(0, 0.4f, 0.45f), new Vector3(0.05f, 0.04f, 0.02f));
+            Block(anim, fur, new Vector3(0f, 0.5f, 0.247f), new Vector3(0.213f, 0.17f, 0.196f)); // head
+            Block(anim, cream, new Vector3(0f, 0.468f, 0.353f), new Vector3(0.119f, 0.077f, 0.068f)); // muzzle
+            Block(anim, Palette.Umber, new Vector3(0f, 0.497f, 0.391f), new Vector3(0.051f, 0.038f, 0.017f)); // nose
             foreach (float ex in new[] { -0.055f, 0.055f })
             {
-                Block(anim, Palette.Night, new Vector3(ex, 0.42f, 0.388f), new Vector3(0.035f, 0.025f, 0.02f));
-                Block(anim, Palette.Rosette, new Vector3(ex * 1.5f, 0.5f, 0.27f), new Vector3(0.07f, 0.07f, 0.03f));
+                Block(anim, Palette.Night, new Vector3(ex, 0.523f, 0.343f), new Vector3(0.031f, 0.022f, 0.017f));
+                Block(anim, Palette.Rosette, new Vector3(ex * 1.3909f, 0.6035f, 0.2295f), new Vector3(0.068f, 0.064f, 0.03f));
             }
 
             // Named 'Tail' so the Critter animation finds it and wags it about this pivot.
             var tail = new GameObject("Tail").transform;
             tail.SetParent(anim, false);
-            tail.localPosition = new Vector3(0, 0.26f, -0.3f);
-            Block(tail, fur, new Vector3(0, 0f, -0.08f), new Vector3(0.07f, 0.07f, 0.18f));
-            Block(tail, fur, new Vector3(0, 0.05f, -0.22f), new Vector3(0.06f, 0.06f, 0.14f));
-            Block(tail, cream, new Vector3(0, 0.09f, -0.31f), new Vector3(0.055f, 0.055f, 0.07f));
+            tail.localPosition = new Vector3(0f, 0.357f, -0.238f);
+            Block(tail, fur, new Vector3(0f, 0f, -0.068f), new Vector3(0.085f, 0.085f, 0.17f));
+            Block(tail, fur, new Vector3(0f, 0.06f, -0.196f), new Vector3(0.077f, 0.077f, 0.145f));
+            Block(tail, cream, new Vector3(0f, 0.11f, -0.2975f), new Vector3(0.068f, 0.068f, 0.085f));
         }
 
         static void Block(Transform parent, Color c, Vector3 pos, Vector3 scale)
