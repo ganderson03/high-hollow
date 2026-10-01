@@ -84,17 +84,29 @@ def dot(a, b):
 
 
 CORNERS = [(sx, sy, sz) for sx in (-1, 1) for sy in (-1, 1) for sz in (-1, 1)]
-FACES = (((0, 1, 3, 2), (0, 0, -1)), ((4, 6, 7, 5), (0, 0, 1)),
-         ((0, 4, 5, 1), (-1, 0, 0)), ((2, 3, 7, 6), (1, 0, 0)),
-         ((1, 5, 7, 3), (0, 1, 0)), ((0, 2, 6, 4), (0, -1, 0)))
-LIGHT = (-0.38, 0.84, -0.39)
+# CORNERS is indexed 4*bx + 2*by + bz, with each b 0 for -1 and 1 for +1, so a face is
+# the four corners sharing one bit. Pairing a face with another face's normal is an easy
+# mistake to make and a hard one to see: the silhouette stays right while every face
+# takes someone else's light.
+FACES = (((0, 2, 6, 4), (0, 0, -1)), ((1, 5, 7, 3), (0, 0, 1)),
+         ((0, 1, 3, 2), (-1, 0, 0)), ((4, 6, 7, 5), (1, 0, 0)),
+         ((2, 3, 7, 6), (0, 1, 0)), ((0, 4, 5, 1), (0, -1, 0)))
+# The scene's own Sun: its transform points the light along (-0.384, -0.743, 0.548),
+# so this is the vector pointing back at it. Getting the sign of x wrong put the key
+# light almost on the camera axis, which lit the chest as brightly as the back and read
+# as underlit.
+LIGHT = (0.384, 0.743, -0.548)
 
 
 def shade(c, n):
     nl = max(0.0, dot(n, LIGHT))
-    k = 0.58 + 0.42 * nl
-    out = tuple(min(255, round(v * k)) for v in c)
-    return out if nl > 0.05 else lerp(out, SIENNA, 0.08)   # warm bounce in the shade
+    out = tuple(min(255, round(v * (0.40 + 0.60 * nl))) for v in c)
+    # GridFloor sets a trilight ambient: warm sky above, sienna bounce off the ground.
+    if n[1] > 0.3:
+        return lerp(out, CREAM, 0.10 * n[1])
+    if n[1] < -0.3 or nl < 0.05:
+        return lerp(out, SIENNA, 0.10)
+    return out
 
 
 def project(boxes, yaw_model, cam):
@@ -135,7 +147,9 @@ def sheet(transparent):
     img = Image.new("RGBA", (W * SS, H * SS), bg)
     d = ImageDraw.Draw(img)
 
-    portrait = basis(26, 38)
+    # Viewed from the sun's side, so the face and chest are lit rather than in shadow.
+    # The game camera is fixed at yaw 30 and pitch 58; this is a portrait, not a screenshot.
+    portrait = basis(26, -10)
     base = int(H * 0.74) * SS
 
     for accent, ox in ((SIENNA, 0.27), (PINE, 0.73)):
