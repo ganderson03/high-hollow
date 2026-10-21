@@ -4,9 +4,9 @@ A networked two-player co-op puzzle crawler, drawn like a 1970s national park po
 
 ![The two leopards, seat one in a sienna scarf and seat two in pine](docs/images/player-models.png)
 
-This repository is the **Unity client**. The authoritative simulation is a Rust server that is still being built. Until it exists, a mock feed built into the client stands in for it, so the game is fully playable offline.
+This repository is the **Unity client**. The authoritative simulation is a separate server called **Hollowline**, which is still being built: it owns all game state, and the client renders what it is told and sends input. Until it exists, a mock feed built into the client stands in for it, so the game is fully playable offline.
 
-Current version: **v0.8.1** (see [Versioning](#versioning)).
+Current version: **v0.8.2** (see [Versioning](#versioning)).
 
 ## Requirements
 
@@ -159,7 +159,7 @@ An entity is `[x, y, kind, state, carried_by]`, where `carried_by` is `-1` when 
 
 Overlay entries are `substituted: [id, look]` and `phantoms: [x, y, look]`, where a look is an appearance key (the kind values above).
 
-**Not yet agreed with the Rust server.** These are client-side conventions until the server settles them:
+**Not yet agreed with Hollowline.** These are client-side conventions until the server settles them:
 
 - Seat N is the Nth Player entity; the mock always gives its one client both seats.
 - `level` and `round` are client additions to the original protocol.
@@ -239,6 +239,7 @@ The project follows [Semantic Versioning](https://semver.org). While it is below
 
 | Version | Summary |
 | --- | --- |
+| v0.8.2 | The server has a name, Hollowline, and the player is built as High Hollow rather than as "My project" |
 | v0.8.1 | Level maps mark both spawns and give every piece a colour the floor does not already use |
 | v0.8.0 | Documentation renders: a prop sheet, and level maps drawn with the solver's route on them |
 | v0.7.1 | The field guide is swatches and names, without the sentences |

@@ -1,6 +1,6 @@
 # Levels and mechanics: design
 
-Status: **decisions folded in; partly built**. As of v0.3.0 the client and mock have two seats with switching, minor failures with room entrances, door links, rectangular levels with an apron, trail progression, and the core module split. Major failures, the vote reset, checkpoints, disconnect handling and every non-core mechanic are not built yet. It covers the level trail, one bespoke mechanic per level, the framework they need, and every protocol change they imply, so the Rust server can be planned against the same document.
+Status: **decisions folded in; partly built**. As of v0.3.0 the client and mock have two seats with switching, minor failures with room entrances, door links, rectangular levels with an apron, trail progression, and the core module split. Major failures, the vote reset, checkpoints, disconnect handling and every non-core mechanic are not built yet. It covers the level trail, one bespoke mechanic per level, the framework they need, and every protocol change they imply, so Hollowline, the authoritative server, can be planned against the same document.
 
 ## Decisions
 
@@ -22,7 +22,7 @@ Status: **decisions folded in; partly built**. As of v0.3.0 the client and mock 
 
 - The game becomes a **linear trail** through six **biomes** for **two leopards**. Each biome is a short run of levels built around **one bespoke mechanic**, ending on a longer finale. Reaching a summit loads the next level.
 - Within a biome the mechanic is taught alone, then twisted, then combined with earlier biomes' mechanics, so the trail gets harder by combination rather than by new rules alone.
-- Before any level is built, the mock's rules are split into **per-mechanic modules** that a level switches on from its JSON. The Rust server should mirror the same split.
+- Before any level is built, the mock's rules are split into **per-mechanic modules** that a level switches on from its JSON. Hollowline should mirror the same split.
 - Protocol cost: **five new entity kinds**, one new hazard state, a `water` field on snapshots, rectangular level dimensions, seat control and vote messages, a trail manifest, and new level-file fields. Ice and split sight need no new kinds at all.
 
 ## Biomes
@@ -193,7 +193,7 @@ IMechanic
   Overlay(seat, overlay)                split sight
 ```
 
-The core (movement, keys, doors, goal, round flow, both failure grades, vote reset, seats) becomes the "hollow" module, so the existing level is the first client of the new interface. The Rust server should use the same boundaries, which makes rule parity reviewable one mechanic at a time.
+The core (movement, keys, doors, goal, round flow, both failure grades, vote reset, seats) becomes the "hollow" module, so the existing level is the first client of the new interface. Hollowline should use the same boundaries, which makes rule parity reviewable one mechanic at a time.
 
 ### Ordering rules (for hash parity later)
 
