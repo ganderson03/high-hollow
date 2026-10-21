@@ -116,3 +116,10 @@ InitTestScene*.unity*
 # Python bytecode from tools/
 __pycache__/
 *.pyc
+
+# Hollowline server. Its build output is ignored, but its project file is not:
+# the template ignores every *.csproj because Unity generates those, and this one
+# is written by hand.
+server/bin/
+server/obj/
+!server/*.csproj

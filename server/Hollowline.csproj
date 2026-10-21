@@ -1,0 +1,28 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <OutputType>Exe</OutputType>
+    <TargetFramework>net10.0</TargetFramework>
+    <AssemblyName>hollowline</AssemblyName>
+    <RootNamespace>Hollowline</RootNamespace>
+    <!-- The shared sources below are also compiled by Unity, which is on C# 9. Holding the
+         whole project to the same level stops a feature slipping into them that the editor
+         then refuses. -->
+    <LangVersion>9.0</LangVersion>
+    <InvariantGlobalization>true</InvariantGlobalization>
+    <TreatWarningsAsErrors>false</TreatWarningsAsErrors>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <!-- Not copies. These are the very files Unity compiles into Crawler.Protocol and
+         Crawler.Mock, both of which declare noEngineReferences, so the rules build outside
+         the engine without a line of change. One rule set, two hosts. -->
+    <Compile Include="..\Assets\Crawler\Protocol\**\*.cs" LinkBase="Shared\Protocol" />
+    <Compile Include="..\Assets\Crawler\Mock\**\*.cs" LinkBase="Shared\Mock" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <PackageReference Include="Newtonsoft.Json" Version="13.0.3" />
+  </ItemGroup>
+
+</Project>

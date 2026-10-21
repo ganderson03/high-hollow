@@ -4,9 +4,9 @@ A networked two-player co-op puzzle crawler, drawn like a 1970s national park po
 
 ![The two leopards, seat one in a sienna scarf and seat two in pine](docs/images/player-models.png)
 
-This repository is the **Unity client**. The authoritative simulation is a separate server called **Hollowline**, which is still being built: it owns all game state, and the client renders what it is told and sends input. Until it exists, a mock feed built into the client stands in for it, so the game is fully playable offline.
+This repository is the **Unity client**. The authoritative simulation is a separate server called **Hollowline**, in `server/`: it owns all game state, and the client renders what it is told and sends input. A mock feed inside the client stands in for it when you play offline, which is still the default.
 
-Current version: **v0.8.2** (see [Versioning](#versioning)).
+Current version: **v0.9.0** (see [Versioning](#versioning)).
 
 ## Requirements
 
@@ -36,6 +36,27 @@ If the first open fails, the cause is almost always outside the repository:
 | A script or texture is a few lines of text starting with `version https://git-lfs` | Something was committed through LFS from a machine that had it installed | Install Git LFS and run `git lfs pull` |
 
 The last row should never happen. `.gitattributes` carries the Unity template's long list of LFS file types, but the `lfs` macro is defined to mark those types binary **without** routing them through LFS, so a clone never needs LFS installed.
+
+## Hollowline, the server
+
+`server/` is the authoritative server: a headless .NET console app that owns the simulation and serves clients over TCP. It is **not** a second copy of the rules. Its project compiles the very files Unity compiles, `Assets/Crawler/Protocol` and `Assets/Crawler/Mock`, which works because both assemblies declare `noEngineReferences`. One rule set, two hosts.
+
+```bash
+dotnet run --project server/Hollowline.csproj -- --port 7777 --level foothills-1
+```
+
+Then in the client turn `useMockFeed` off and point `host` and `port` at it. It needs the .NET 10 SDK; the client does not.
+
+| Flag | Default | What it does |
+| --- | --- | --- |
+| `--port` | `7777` | Port to listen on |
+| `--level` | `foothills-1` | Level to start on; the trail continues from there |
+| `--levels` | found automatically | Path to `StreamingAssets/levels`, walked up from the binary |
+| `--quiet` | off | Silences the connection and level log |
+
+It ticks at 60 Hz, sends snapshots at 20 Hz, speaks the same JSON Lines the in-client mock does, and walks the trail when a level is won.
+
+**What it does not do yet.** Every client is handed both leopards, exactly as the mock does, so a second client steers the same pair rather than getting one each. There is no per-client filtering either, so every client is sent the same view. Splitting seats per client and filtering each client's view of hidden pits and false keys is the next piece of work.
 
 ### Bootstrap settings
 
@@ -239,6 +260,7 @@ The project follows [Semantic Versioning](https://semver.org). While it is below
 
 | Version | Summary |
 | --- | --- |
+| v0.9.0 | Hollowline runs: a headless server hosting the same rule code the client does, serving clients over TCP |
 | v0.8.2 | The server has a name, Hollowline, and the player is built as High Hollow rather than as "My project" |
 | v0.8.1 | Level maps mark both spawns and give every piece a colour the floor does not already use |
 | v0.8.0 | Documentation renders: a prop sheet, and level maps drawn with the solver's route on them |

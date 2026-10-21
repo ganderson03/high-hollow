@@ -16,6 +16,21 @@ namespace Crawler.Protocol
     }
 
     /// <summary>
+    /// Receives decoded messages sent BY a client: the server's side of IInboundHandler.
+    /// Hollowline implements it. Keeping it here means both ends of the wire are declared
+    /// in one place, which is what the Rust port has to match.
+    /// </summary>
+    public interface IClientHandler
+    {
+        void OnHello(string name);
+        void OnInput(InputMsg msg);
+        void OnChat(ChatMsg msg);
+
+        /// <summary>A request to steer a seat. The server decides whether it is allowed.</summary>
+        void OnControl(int seat);
+    }
+
+    /// <summary>
     /// The one seam between the client and "a server". ServerConnection and MockFeed
     /// both implement it; nothing downstream knows which one it has.
     /// </summary>

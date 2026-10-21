@@ -115,6 +115,55 @@ namespace Crawler.Protocol
             return ov;
         }
 
+        /// <summary>
+        /// Decode one line a client sent and dispatch it: the mirror of TryDispatch, used by
+        /// the server. A client's message is a request, never a fact, so everything here is
+        /// treated as untrusted and a malformed line is reported rather than thrown.
+        /// </summary>
+        public static bool TryDispatchClient(string line, IClientHandler handler, out string error)
+        {
+            error = null;
+            JObject o;
+            try { o = JObject.Parse(line); }
+            catch (JsonException e) { error = "bad json: " + e.Message; return false; }
+
+            try
+            {
+                switch ((string)o["t"])
+                {
+                    case "hello":
+                        handler.OnHello((string)o["name"] ?? "");
+                        return true;
+
+                    case "input":
+                        handler.OnInput(new InputMsg(
+                            (uint)o["tick"],
+                            MoveFromWire((string)o["move"]),
+                            (bool)o["interact"]));
+                        return true;
+
+                    case "chat":
+                        handler.OnChat(new ChatMsg { From = (byte)o["from"], Text = (string)o["text"] ?? "" });
+                        return true;
+
+                    case "control":
+                        handler.OnControl((int)o["seat"]);
+                        return true;
+
+                    default:
+                        error = "unknown client message type: " + (string)o["t"];
+                        return false;
+                }
+            }
+            catch (Exception e) when (e is InvalidCastException || e is ArgumentException
+                                      || e is NullReferenceException || e is FormatException
+                                      || e is OverflowException || e is JsonException)
+            {
+                error = "malformed " + (string)o["t"] + ": " + e.Message;
+                return false;
+            }
+        }
+
         // ---------------------------------------------------------------- encode (client -> server)
 
         public static string EncodeHello(string name) =>
@@ -216,6 +265,20 @@ namespace Crawler.Protocol
                 case "playing": return RoundState.Playing;
                 case "won": return RoundState.Won;
                 default: throw new FormatException("unknown round state: " + s);
+            }
+        }
+
+        public static MoveDir MoveFromWire(string s)
+        {
+            switch (s)
+            {
+                case "n": return MoveDir.N;
+                case "s": return MoveDir.S;
+                case "e": return MoveDir.E;
+                case "w": return MoveDir.W;
+                case "none":
+                case null: return MoveDir.None;
+                default: throw new FormatException("unknown move: " + s);
             }
         }
 
