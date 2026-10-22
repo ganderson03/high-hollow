@@ -39,7 +39,16 @@ CELL = {
 }
 
 
-def render(level_id, with_route=True, with_name=False):
+# The same cell, seen by two different parties. This is the dissonance the server
+# creates on purpose: it withholds the pits it knows are there, and shows a key that
+# does not exist. "design" is neither view, it is the author's.
+VIEWS = {
+    "truth": {"h": "H", "k": "."},      # hidden pits are real pits; the false key is nothing
+    "client": {"h": ".", "k": "K"},     # the pits are withheld; the false key looks real
+}
+
+
+def render(level_id, with_route=True, with_name=False, view="design", cell=46):
     path = os.path.join(LEVELS, level_id + ".json")
     if with_route:
         d_, w, h, errs, duo, _states, _solo = levelcheck.analyse(path, max_states=14_000_000)
@@ -52,7 +61,7 @@ def render(level_id, with_route=True, with_name=False):
         r = rows[y]
         return r[x] if x < len(r) else "#"
 
-    margin, cell = 60, 46
+    margin = 60
     W, H = w * cell + margin * 2, h * cell + margin * 2 + (46 if with_name else 0)
     img, d = canvas(W, H, False)
 
@@ -109,6 +118,7 @@ def render(level_id, with_route=True, with_name=False):
     for y in range(h):
         for x in range(w):
             g = at(x, y)
+            g = VIEWS.get(view, {}).get(g, g)
             if g in CELL:
                 fill, inset, outline = CELL[g]
                 rect(x, y, inset, fill, outline)
@@ -143,9 +153,12 @@ def render(level_id, with_route=True, with_name=False):
 def main():
     args = [a for a in sys.argv[1:] if not a.startswith("--")]
     flags = {a for a in sys.argv[1:] if a.startswith("--")}
+    view = "truth" if "--truth" in flags else "client" if "--client" in flags else "design"
     for level_id in (args or ["foothills-1"]):
-        img = render(level_id, "--no-route" not in flags, "--name" in flags)
+        img = render(level_id, "--no-route" not in flags, "--name" in flags, view)
         suffix = "-map" if "--no-route" in flags else "-route"
+        if view != "design":
+            suffix = "-" + view
         out = os.path.join(out_dir(), level_id + suffix + ".png")
         img.convert("RGB").save(out)
         print("wrote", os.path.normpath(out), img.size)
