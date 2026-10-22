@@ -151,4 +151,5 @@ def main():
         print("wrote", os.path.normpath(out), img.size)
 
 
-main()
+if __name__ == "__main__":
+    main()

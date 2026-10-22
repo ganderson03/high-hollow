@@ -80,4 +80,5 @@ def main():
         print("wrote", os.path.normpath(path), img.size)
 
 
-main()
+if __name__ == "__main__":
+    main()

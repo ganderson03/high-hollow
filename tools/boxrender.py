@@ -93,13 +93,16 @@ def shade(c, n):
     return out
 
 
-def project(boxes, yaw_model, cam):
-    """Every visible face as (depth, screen polygon, colour), far to near."""
+def project(boxes, yaw_model, cam, offset=(0.0, 0.0, 0.0)):
+    """Every visible face as (depth, screen polygon, colour), far to near.
+
+    `offset` places the object in the world after its own yaw, so several objects can be
+    projected separately and then sorted together as one scene."""
     f, r, u = cam
     out = []
     for pos, scale, color in boxes:
         hs = (scale[0] / 2, scale[1] / 2, scale[2] / 2)
-        pts3 = [rot_y((pos[0] + sx * hs[0], pos[1] + sy * hs[1], pos[2] + sz * hs[2]), yaw_model)
+        pts3 = [world(rot_y((pos[0] + sx * hs[0], pos[1] + sy * hs[1], pos[2] + sz * hs[2]), yaw_model), offset)
                 for sx, sy, sz in CORNERS]
         for idx, n in FACES:
             wn = rot_y(n, yaw_model)
@@ -109,6 +112,65 @@ def project(boxes, yaw_model, cam):
             out.append((max(dot(pts3[i], f) for i in idx), poly, shade(color, wn)))
     out.sort(key=lambda t: -t[0])
     return out
+
+
+def world(p, offset):
+    return (p[0] + offset[0], p[1] + offset[1], p[2] + offset[2])
+
+
+def flat(points, cam):
+    """Project points already in world space, for things lying on the ground."""
+    _f, r, u = cam
+    return [(dot(p, r), dot(p, u)) for p in points]
+
+
+def shadows(boxes, yaw_model, cam, offset=(0.0, 0.0, 0.0)):
+    """Each box flattened onto y=0 along the sun, as one screen polygon per box.
+
+    Drawn before the models and after the floor. A real cast shadow rather than a blob
+    under the feet: the light is the scene's own Sun, so the shadows fall the way the
+    shading says they should."""
+    out = []
+    for pos, scale, _color in boxes:
+        hs = (scale[0] / 2, scale[1] / 2, scale[2] / 2)
+        pts = []
+        for sx, sy, sz in CORNERS:
+            x, y, z = world(rot_y((pos[0] + sx * hs[0], pos[1] + sy * hs[1], pos[2] + sz * hs[2]),
+                                  yaw_model), offset)
+            t = y / LIGHT[1]
+            pts.append((x - LIGHT[0] * t, 0.0, z - LIGHT[2] * t))
+        out.append(hull(flat(pts, cam)))
+    return out
+
+
+def hull(points):
+    """Convex hull, monotone chain. The eight corners of a box flatten to a hexagon."""
+    pts = sorted(set(points))
+    if len(pts) < 3:
+        return pts
+
+    def half(seq):
+        out = []
+        for p in seq:
+            while len(out) >= 2 and cross(out[-2], out[-1], p) <= 0:
+                out.pop()
+            out.append(p)
+        return out[:-1]
+
+    return half(pts) + half(list(reversed(pts)))
+
+
+def cross(o, a, b):
+    return (a[0] - o[0]) * (b[1] - o[1]) - (a[1] - o[1]) * (b[0] - o[0])
+
+
+def fit(faces, extra, cx, baseline, fit_w, fit_h):
+    """Work out one screen transform for a whole scene and hand it back as a function."""
+    xs = [p[0] for _, poly, _ in faces for p in poly] + [p[0] for poly in extra for p in poly]
+    ys = [p[1] for _, poly, _ in faces for p in poly] + [p[1] for poly in extra for p in poly]
+    k = min(fit_w / (max(xs) - min(xs)), fit_h / (max(ys) - min(ys)))
+    mx, lo = (max(xs) + min(xs)) / 2, min(ys)
+    return lambda p: (cx + (p[0] - mx) * k, baseline - (p[1] - lo) * k)
 
 
 def draw(d, faces, cx, baseline, fit_w, fit_h):

@@ -6,7 +6,7 @@ A networked two-player co-op puzzle crawler, drawn like a 1970s national park po
 
 This repository is the **Unity client**. The authoritative simulation is a separate server called **Hollowline**, in `server/`: it owns all game state, and the client renders what it is told and sends input. A mock feed inside the client stands in for it when you play offline, which is still the default.
 
-Current version: **v0.9.0** (see [Versioning](#versioning)).
+Current version: **v0.9.1** (see [Versioning](#versioning)).
 
 ## Requirements
 
@@ -216,6 +216,7 @@ A door opens by its **links** if it has any: `"links": [{ "from": [col, row], "t
 - `python tools/build_foothills.py` regenerates the Foothills level files from code, where rooms, pieces and links are placed by coordinate rather than by hand-editing the map.
 - `python tools/render_models.py` draws the model sheet at the top of this file, from the same box list and palette the game uses. It writes two files, one on the poster background and one with a transparent background for slides, and it needs Pillow but not Unity.
 - `python tools/render_props.py` does the same for the props.
+- `python tools/render_scene.py` stages the pair instead of lining them up: sienna holding a plate down, pine at the door it opens, on the game's own floor, with shadows cast along the scene's sun rather than painted under their feet.
 - `python tools/render_level.py <level-id> [--no-route] [--name]` draws a level from above. By default it solves the level first and lays the shortest cooperative route over the map, one line per leopard, with a ring wherever control passes between them. The picture cannot disagree with the game: if a route is drawn, the solver proved it wins.
 - All three share `tools/boxrender.py`, which holds the palette, the scene's own sun direction and the orthographic box renderer.
 
@@ -260,6 +261,7 @@ The project follows [Semantic Versioning](https://semver.org). While it is below
 
 | Version | Summary |
 | --- | --- |
+| v0.9.1 | A staged render of the two leopards, with cast shadows |
 | v0.9.0 | Hollowline runs: a headless server hosting the same rule code the client does, serving clients over TCP |
 | v0.8.2 | The server has a name, Hollowline, and the player is built as High Hollow rather than as "My project" |
 | v0.8.1 | Level maps mark both spawns and give every piece a colour the floor does not already use |
