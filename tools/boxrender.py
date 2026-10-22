@@ -100,18 +100,44 @@ def project(boxes, yaw_model, cam, offset=(0.0, 0.0, 0.0)):
     projected separately and then sorted together as one scene."""
     f, r, u = cam
     out = []
-    for pos, scale, color in boxes:
+    for b, (pos, scale, color) in enumerate(boxes):
         hs = (scale[0] / 2, scale[1] / 2, scale[2] / 2)
-        pts3 = [world(rot_y((pos[0] + sx * hs[0], pos[1] + sy * hs[1], pos[2] + sz * hs[2]), yaw_model), offset)
-                for sx, sy, sz in CORNERS]
+        local = [(pos[0] + sx * hs[0], pos[1] + sy * hs[1], pos[2] + sz * hs[2]) for sx, sy, sz in CORNERS]
+        pts3 = [world(rot_y(p, yaw_model), offset) for p in local]
         for idx, n in FACES:
             wn = rot_y(n, yaw_model)
             if dot(wn, f) >= 0:                            # facing away: never seen
+                continue
+            if buried([local[i] for i in idx], boxes, b):  # inside another box: never seen either
                 continue
             poly = [(dot(pts3[i], r), dot(pts3[i], u)) for i in idx]
             out.append((max(dot(pts3[i], f) for i in idx), poly, shade(color, wn)))
     out.sort(key=lambda t: -t[0])
     return out
+
+
+def buried(face, boxes, skip, eps=1e-4):
+    """True if this face lies wholly inside another box, so nothing should ever see it.
+
+    Models here are assemblies of overlapping boxes, and sorting whole faces by depth is
+    not enough for shapes that interpenetrate: a face inside the body can sort in front of
+    the body's own surface and open a window into it. Dropping faces that are enclosed
+    anyway removes the case that actually happens."""
+    for j, (pos, scale, _c) in enumerate(boxes):
+        if j == skip:
+            continue
+        inside = True
+        for p in face:
+            for k in (0, 1, 2):
+                half = scale[k] / 2
+                if not (pos[k] - half + eps <= p[k] <= pos[k] + half - eps):
+                    inside = False
+                    break
+            if not inside:
+                break
+        if inside:
+            return True
+    return False
 
 
 def world(p, offset):

@@ -6,7 +6,7 @@ A networked two-player co-op puzzle crawler, drawn like a 1970s national park po
 
 This repository is the **Unity client**. The authoritative simulation is a separate server called **Hollowline**, in `server/`: it owns all game state, and the client renders what it is told and sends input. A mock feed inside the client stands in for it when you play offline, which is still the default.
 
-Current version: **v0.9.2** (see [Versioning](#versioning)).
+Current version: **v0.9.3** (see [Versioning](#versioning)).
 
 ## Requirements
 
@@ -261,6 +261,7 @@ The project follows [Semantic Versioning](https://semver.org). While it is below
 
 | Version | Summary |
 | --- | --- |
+| v0.9.3 | Renders are solid: faces buried inside other boxes no longer sort to the front |
 | v0.9.2 | A thicker tail that sweeps and curls instead of three stepped stubs |
 | v0.9.1 | A staged render of the two leopards, with cast shadows |
 | v0.9.0 | Hollowline runs: a headless server hosting the same rule code the client does, serving clients over TCP |
