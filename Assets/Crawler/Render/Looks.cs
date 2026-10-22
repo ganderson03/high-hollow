@@ -370,12 +370,16 @@ namespace Crawler.Render
             }
 
             // Named 'Tail' so the Critter animation finds it and wags it about this pivot.
+            // Five overlapping segments rather than three stepped ones: the old tail showed
+            // daylight at every corner and was thinner than a leg.
             var tail = new GameObject("Tail").transform;
             tail.SetParent(anim, false);
-            tail.localPosition = new Vector3(0f, 0.357f, -0.238f);
-            Block(tail, fur, new Vector3(0f, 0f, -0.068f), new Vector3(0.085f, 0.085f, 0.17f));
-            Block(tail, fur, new Vector3(0f, 0.06f, -0.196f), new Vector3(0.077f, 0.077f, 0.145f));
-            Block(tail, cream, new Vector3(0f, 0.11f, -0.2975f), new Vector3(0.068f, 0.068f, 0.085f));
+            tail.localPosition = new Vector3(0f, 0.33f, -0.238f);
+            Block(tail, fur, new Vector3(0f, 0f, -0.055f), new Vector3(0.105f, 0.105f, 0.145f));
+            Block(tail, fur, new Vector3(0.012f, -0.01f, -0.155f), new Vector3(0.098f, 0.098f, 0.14f));
+            Block(tail, fur, new Vector3(0.035f, 0f, -0.25f), new Vector3(0.09f, 0.09f, 0.13f));
+            Block(tail, fur, new Vector3(0.07f, 0.03f, -0.325f), new Vector3(0.082f, 0.082f, 0.115f));
+            Block(tail, cream, new Vector3(0.11f, 0.075f, -0.385f), new Vector3(0.072f, 0.072f, 0.1f));
         }
 
         static void Block(Transform parent, Color c, Vector3 pos, Vector3 scale)
