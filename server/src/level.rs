@@ -43,6 +43,8 @@ pub struct Level {
     pub regions: Vec<Region>,
     pub links: Vec<Link>,
     pub mechanics: Vec<String>,
+    /// Cells that are ice beneath an entity glyph (a key on the lake), from `"ice"`.
+    pub ice_under: Vec<(i32, i32)>,
 }
 
 #[derive(Deserialize)]
@@ -60,6 +62,8 @@ struct RawLevel {
     links: Vec<RawLink>,
     #[serde(default)]
     mechanics: Vec<String>,
+    #[serde(default)]
+    ice: Vec<Vec<i32>>,
 }
 
 #[derive(Deserialize)]
@@ -125,6 +129,7 @@ impl Level {
             regions: Vec::new(),
             links: Vec::new(),
             mechanics: raw.mechanics,
+            ice_under: Vec::new(),
         };
 
         for r in raw.regions {
@@ -145,7 +150,24 @@ impl Level {
             }
             level.links.push(link);
         }
+
+        // Extra ice cells, [column, row] like links.
+        for cell in raw.ice {
+            let [c, r] = cell[..] else {
+                return Err("an ice cell must be [col, row]".into());
+            };
+            let at = (c, height - 1 - r);
+            if !level.in_bounds(at.0, at.1) {
+                return Err("an ice cell is outside the map".into());
+            }
+            level.ice_under.push(at);
+        }
         Ok(level)
+    }
+
+    /// Ice: a '~' cell, or a cell the level lists under `"ice"`.
+    pub fn is_ice(&self, x: i32, y: i32) -> bool {
+        self.at(x, y) == '~' || self.ice_under.contains(&(x, y))
     }
 
     pub fn in_bounds(&self, x: i32, y: i32) -> bool {

@@ -5,6 +5,7 @@ using Crawler.Protocol;
 using Crawler.Render;
 using Crawler.UI;
 using UnityEngine;
+using UnityEngine.InputSystem;
 
 namespace Crawler.App
 {
@@ -50,6 +51,7 @@ namespace Crawler.App
         RegionBanner _banner;
         float _roundStart;
         bool _won;
+        bool _choosing; // the partner did not come back: B takes both leopards, Q leaves
 
         void Start()
         {
@@ -63,6 +65,7 @@ namespace Crawler.App
 
             input.TickSource = () => world.LastTick;
             input.OnSwitch = SwitchLeopard;
+            input.OnVote = () => _link?.SendVote(true);
             input.Suppressed = () => chat.IsTyping || PosterBlocking();
             chat.Blocked = PosterBlocking;
             chat.OnSubmit = text => _link?.SendChat(text);
@@ -105,6 +108,16 @@ namespace Crawler.App
         {
             _link?.Pump(this);
             TrackRegion();
+            PollChoice();
+        }
+
+        /// <summary>While the server asks whether to go on alone: B takes both leopards, Q leaves the trail.</summary>
+        void PollChoice()
+        {
+            var kb = Keyboard.current;
+            if (!_choosing || _link == null || kb == null || chat.IsTyping) return;
+            if (kb.bKey.wasPressedThisFrame) { _choosing = false; _link.SendChoice(ChoicePick.Both); }
+            else if (kb.qKey.wasPressedThisFrame) { _choosing = false; _link.SendChoice(ChoicePick.Quit); }
         }
 
         void OnDestroy()
@@ -189,6 +202,16 @@ namespace Crawler.App
 
         public void OnRound(RoundMsg m)
         {
+            // The server explains pauses and restarts in chat; the client adds only the keys to press.
+            if (m.State == RoundState.Paused) return;
+            if (m.State == RoundState.Choose)
+            {
+                _choosing = true;
+                chat.AddSystem("your partner has not come back. B: take both leopards   Q: leave the trail");
+                return;
+            }
+            _choosing = false;
+
             if (m.State == RoundState.Won)
             {
                 _won = true;
@@ -217,6 +240,12 @@ namespace Crawler.App
             _activeSeat = m.Active;
             world.SetSeats(_seats, _activeSeat);
             _region = -1; // re-announce the room the newly steered leopard is in
+        }
+
+        public void OnVote(VoteMsg m)
+        {
+            if (m.State == VoteState.Open && m.By != _localClient)
+                chat.AddSystem("your partner wants to restart the level. press R to agree.");
         }
 
         public void OnSnapshot(Snapshot m) => world.ApplySnapshot(m);

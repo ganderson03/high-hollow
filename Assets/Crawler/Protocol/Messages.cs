@@ -13,6 +13,11 @@ namespace Crawler.Protocol
         Hazard = 5,
         Goal = 6,
         Sightstone = 7,
+        Ledge = 8,       // state 0 intact, 1 cracked, 2 collapsed
+        Boulder = 9,     // state: shape (0 boulder, 1 slab along x, 2 along y) + 4 straining + 8 gone
+        Sluice = 10,     // state: open exit, 0 n, 1 e, 2 s, 3 w
+        Wheel = 11,      // state 1 = turning
+        Checkpoint = 12, // state 1 = lit
     }
 
     public enum MoveDir : byte { None, N, S, E, W }
@@ -51,11 +56,22 @@ namespace Crawler.Protocol
         public int Active;
     }
 
+    public readonly struct Cell
+    {
+        public readonly int X;
+        public readonly int Y;
+        public Cell(int x, int y) { X = x; Y = y; }
+    }
+
     /// <summary>Authoritative world state. Index in Entities is the entity id.</summary>
     public sealed class Snapshot
     {
         public uint Tick;
         public EntityState[] Entities;
+        /// <summary>Cells with flowing water, top row first. Empty when the level is dry.</summary>
+        public Cell[] Water = new Cell[0];
+        /// <summary>XXH3-64 of the canonical encoding as 16 hex digits; null from servers that do not send it.</summary>
+        public string Hash;
     }
 
     public readonly struct Substitution
@@ -109,14 +125,35 @@ namespace Crawler.Protocol
         public string Id;
     }
 
-    public enum RoundState : byte { Playing, Won }
+    /// <summary>
+    /// Playing and Won as before. Paused: the partner dropped and the world is frozen while they
+    /// have Seconds left to come back. Choose: they did not; this client picks Both or Quit.
+    /// </summary>
+    public enum RoundState : byte { Playing, Won, Paused, Choose }
 
     /// <summary>Server-decided round state; the client only displays it.</summary>
     public sealed class RoundMsg
     {
         public uint Tick;
         public RoundState State;
+        /// <summary>Why a round started that was not a fresh level: "fell", "vote" or "partner_left"; else null.</summary>
+        public string Reason;
+        /// <summary>Seconds left to come back, while paused.</summary>
+        public int Seconds;
     }
+
+    public enum VoteState : byte { Open, Passed, Lapsed }
+
+    /// <summary>A restart proposal: who proposed it, how long it has left, and how it ended.</summary>
+    public sealed class VoteMsg
+    {
+        public byte By;
+        public int TicksLeft;
+        public VoteState State;
+    }
+
+    /// <summary>The answer to RoundState.Choose.</summary>
+    public enum ChoicePick : byte { Both, Quit }
 
     public enum LinkStatus { Idle, Connecting, Connected, Mock, Disconnected, Failed, ProtocolError }
 }

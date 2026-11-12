@@ -3,8 +3,8 @@
 mod common;
 
 use common::{game, lines_to, types};
-use hollow::game::{Game, Out, TICKS_PER_SNAPSHOT, WIN_HOLD_TICKS};
-use hollow::protocol::{ClientMsg, Move};
+use hollow::game::{Game, Out, PAUSE_SECONDS, TICKS_PER_SNAPSHOT, TICK_HZ, VOTE_TICKS, WIN_HOLD_TICKS};
+use hollow::protocol::{ClientMsg, Move, Pick};
 use serde_json::json;
 
 fn hello(g: &mut Game, conn: u64, name: &str) -> Vec<Out> {
@@ -86,7 +86,7 @@ fn input_moves_the_seat_being_steered() {
     hello(&mut g, 1, "snep");
     let start = g.sim().world.pos;
     g.handle(1, ClientMsg::Control { seat: 1 });
-    g.handle(1, ClientMsg::Input { tick: 0, dir: Move::E, interact: false });
+    g.handle(1, ClientMsg::Input { tick: g.tick(), dir: Move::E, interact: false });
     g.step();
     assert_eq!(g.sim().world.pos[0], start[0], "the idle leopard stands still");
     assert_eq!(g.sim().world.pos[1], (start[1].0 + 1, start[1].1));
@@ -108,15 +108,173 @@ fn snapshots_go_out_at_the_replication_rate_and_only_with_players() {
     assert_eq!(snaps, 4);
 }
 
-#[test]
-fn when_a_partner_leaves_the_other_holds_both() {
+/// Two players, then the first drops: the world pauses for the second.
+fn dropped_partner() -> Game {
     let mut g = game("foothills-1");
     hello(&mut g, 1, "snep");
     hello(&mut g, 2, "pine");
+    for _ in 0..10 {
+        g.step();
+    }
+    g.take_out();
     g.leave(1);
+    g
+}
+
+#[test]
+fn a_dropped_partner_pauses_the_world_with_a_countdown() {
+    let mut g = dropped_partner();
+    let lines = lines_to(&g.take_out(), 2);
+    assert_eq!(lines[0], json!({"t":"round","tick":10,"state":"paused","reason":"partner_left","seconds":60}));
+    assert!(lines.iter().any(|l| l["text"] == "snep dropped. the trail waits a minute for them to come back."));
+    assert!(g.paused());
+
+    // Frozen: no ticks, no snapshots, inputs ignored, and the stayer keeps only its own leopard.
+    let before = g.sim().world.pos;
+    g.handle(2, ClientMsg::Input { tick: g.tick(), dir: Move::N, interact: false });
+    g.handle(2, ClientMsg::Control { seat: 0 });
+    for _ in 0..TICK_HZ {
+        g.step();
+    }
+    assert_eq!(g.tick(), 10);
+    assert_eq!(g.sim().world.pos, before);
+    let lines = lines_to(&g.take_out(), 2);
+    assert_eq!(lines, [json!({"t":"round","tick":10,"state":"paused","reason":"partner_left","seconds":59})]);
+}
+
+#[test]
+fn after_a_minute_the_stayer_chooses_and_both_takes_both_leopards() {
+    let mut g = dropped_partner();
+    g.handle(2, ClientMsg::Choice { pick: Pick::Both });
+    assert!(g.paused(), "no choice before the minute is up");
+    for _ in 0..PAUSE_SECONDS * TICK_HZ {
+        g.step();
+    }
+    let lines = lines_to(&g.take_out(), 2);
+    assert!(lines.contains(&json!({"t":"round","tick":10,"state":"choose","reason":"partner_left"})));
+
+    g.handle(2, ClientMsg::Choice { pick: Pick::Both });
+    assert!(!g.paused());
     let lines = lines_to(&g.take_out(), 2);
     assert_eq!(lines[0], json!({"t":"seats","yours":[0,1],"active":1}));
-    assert!(lines.iter().any(|l| l["text"].as_str().is_some_and(|t| t.starts_with("snep left the trail"))));
+    assert!(lines.contains(&json!({"t":"round","tick":10,"state":"playing"})));
+    g.step();
+    assert_eq!(g.tick(), 11, "the clock runs again");
+}
+
+#[test]
+fn quitting_at_the_choice_closes_the_connection_and_empties_the_trail() {
+    let mut g = dropped_partner();
+    for _ in 0..PAUSE_SECONDS * TICK_HZ {
+        g.step();
+    }
+    g.take_out();
+    g.handle(2, ClientMsg::Choice { pick: Pick::Quit });
+    assert!(g.take_out().contains(&Out::Close(2)));
+    assert_eq!(g.player_count(), 0);
+    assert!(!g.paused());
+}
+
+#[test]
+fn a_player_who_comes_back_takes_their_seat_and_play_resumes() {
+    let mut g = dropped_partner();
+    g.take_out();
+    let out = hello(&mut g, 3, "snep");
+    assert!(!g.paused());
+    let back = lines_to(&out, 3);
+    assert!(back.contains(&json!({"t":"seats","yours":[0],"active":0})), "the empty seat");
+    let stayer = lines_to(&out, 2);
+    assert!(stayer.contains(&json!({"t":"round","tick":10,"state":"playing"})));
+    assert!(stayer.iter().any(|l| l["text"] == "snep is back. the trail goes on."));
+}
+
+#[test]
+fn a_second_player_joining_a_solo_run_takes_the_leopard_not_being_steered() {
+    let mut g = game("foothills-1");
+    hello(&mut g, 1, "snep");
+    g.handle(1, ClientMsg::Control { seat: 1 });
+    g.take_out();
+    let out = hello(&mut g, 2, "pine");
+    assert_eq!(lines_to(&out, 1)[0], json!({"t":"seats","yours":[1],"active":1}));
+    assert!(lines_to(&out, 2).contains(&json!({"t":"seats","yours":[0],"active":0})));
+}
+
+// ---------------------------------------------------------------------- vote
+
+#[test]
+fn a_vote_needs_the_partner_and_restarts_the_level() {
+    let mut g = game("foothills-1");
+    hello(&mut g, 1, "snep");
+    hello(&mut g, 2, "pine");
+    g.handle(1, ClientMsg::Input { tick: g.tick(), dir: Move::N, interact: false });
+    g.step();
+    let moved = g.sim().world.pos[0];
+    assert_ne!(moved, g.sim().world.spawn[0]);
+
+    g.handle(1, ClientMsg::Vote { reset: true });
+    let out = g.take_out();
+    assert!(lines_to(&out, 2).contains(&json!({"t":"vote","by":0,"ticks_left":600,"state":"open"})));
+    g.handle(1, ClientMsg::Vote { reset: true });
+    assert!(g.take_out().is_empty(), "proposing twice changes nothing");
+
+    g.handle(2, ClientMsg::Vote { reset: true });
+    let lines = lines_to(&g.take_out(), 1);
+    assert!(lines.contains(&json!({"t":"vote","by":0,"ticks_left":0,"state":"passed"})));
+    assert!(lines.contains(&json!({"t":"round","tick":1,"state":"playing","reason":"vote"})));
+    assert_eq!(g.sim().world.pos, g.sim().world.spawn);
+}
+
+#[test]
+fn a_vote_lapses_after_ten_seconds_or_when_declined() {
+    let mut g = game("foothills-1");
+    hello(&mut g, 1, "snep");
+    hello(&mut g, 2, "pine");
+    g.handle(1, ClientMsg::Vote { reset: true });
+    for _ in 0..VOTE_TICKS {
+        g.step();
+    }
+    assert!(lines_to(&g.take_out(), 2).contains(&json!({"t":"vote","by":0,"ticks_left":0,"state":"lapsed"})));
+
+    g.handle(2, ClientMsg::Vote { reset: true });
+    g.handle(1, ClientMsg::Vote { reset: false });
+    assert!(lines_to(&g.take_out(), 1).contains(&json!({"t":"vote","by":1,"ticks_left":0,"state":"lapsed"})));
+}
+
+#[test]
+fn a_player_holding_both_seats_restarts_at_once() {
+    let mut g = game("foothills-1");
+    hello(&mut g, 1, "snep");
+    g.take_out();
+    g.handle(1, ClientMsg::Vote { reset: true });
+    let lines = lines_to(&g.take_out(), 1);
+    assert_eq!(lines[0], json!({"t":"vote","by":0,"ticks_left":0,"state":"passed"}));
+}
+
+#[test]
+fn inputs_sent_before_a_restart_are_dropped() {
+    let mut g = game("foothills-1");
+    hello(&mut g, 1, "snep");
+    for _ in 0..30 {
+        g.step();
+    }
+    let stale = g.tick() - 5;
+    g.handle(1, ClientMsg::Vote { reset: true }); // restarts at the current tick
+    g.handle(1, ClientMsg::Input { tick: stale, dir: Move::S, interact: false });
+    g.step();
+    assert_eq!(g.sim().world.pos, g.sim().world.spawn, "a key held before the restart does not carry over");
+    g.handle(1, ClientMsg::Input { tick: g.tick() + 10 * TICK_HZ, dir: Move::S, interact: false });
+    g.step();
+    assert_eq!(g.sim().world.pos, g.sim().world.spawn, "inputs from a future tick are dropped");
+}
+
+#[test]
+fn snapshots_carry_the_canonical_hash() {
+    let mut g = game("foothills-1");
+    hello(&mut g, 1, "snep");
+    g.step();
+    let snap = lines_to(&g.take_out(), 1).into_iter().find(|l| l["t"] == "snapshot").unwrap();
+    let ents: Vec<(i32, i32, u8, u8, i8)> = serde_json::from_value(snap["entities"].clone()).unwrap();
+    assert_eq!(snap["hash"], hollow::canon::hash_hex(0, &ents, &[]));
 }
 
 #[test]
@@ -146,20 +304,20 @@ fn win_by_route(g: &mut Game, conn: u64, id: &str) {
             "e" => Move::E,
             "w" => Move::W,
             _ => {
-                g.handle(conn, ClientMsg::Input { tick: 0, dir: Move::None, interact: true });
+                g.handle(conn, ClientMsg::Input { tick: g.tick(), dir: Move::None, interact: true });
                 g.step();
                 continue;
             }
         };
         let before = g.sim().world.pos[seat];
-        g.handle(conn, ClientMsg::Input { tick: 0, dir, interact: false });
+        g.handle(conn, ClientMsg::Input { tick: g.tick(), dir, interact: false });
         for _ in 0..20 {
             g.step();
             if g.sim().world.pos[seat] != before {
                 break;
             }
         }
-        g.handle(conn, ClientMsg::Input { tick: 0, dir: Move::None, interact: false });
+        g.handle(conn, ClientMsg::Input { tick: g.tick(), dir: Move::None, interact: false });
         assert_ne!(g.sim().world.pos[seat], before, "{id}: seat {seat} could not move {act}");
     }
     assert!(g.sim().won(), "{id}: route did not win");

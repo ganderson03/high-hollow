@@ -63,6 +63,22 @@ pub enum ClientMsg {
     Control {
         seat: u8,
     },
+    /// After a partner has been gone a minute: keep playing with both leopards, or leave.
+    Choice {
+        pick: Pick,
+    },
+    /// `reset: true` proposes a level restart, or agrees to the partner's proposal;
+    /// `false` withdraws your own proposal or declines the partner's.
+    Vote {
+        reset: bool,
+    },
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "lowercase")]
+pub enum Pick {
+    Both,
+    Quit,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
@@ -70,6 +86,27 @@ pub enum ClientMsg {
 pub enum RoundState {
     Playing,
     Won,
+    /// The partner dropped; the world is frozen while they have `seconds` left to come back.
+    Paused,
+    /// The partner did not come back; this client picks `both` or `quit`.
+    Choose,
+}
+
+/// Why a round started that was not a fresh level: a major failure or an agreed vote.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum RoundReason {
+    Fell,
+    Vote,
+    PartnerLeft,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "lowercase")]
+pub enum VoteState {
+    Open,
+    Passed,
+    Lapsed,
 }
 
 /// `[x, y, kind, state, carried_by]`; `carried_by` is -1 or the carrying seat.
@@ -93,6 +130,12 @@ pub enum ServerMsg {
     Snapshot {
         tick: u32,
         entities: Vec<EntityWire>,
+        /// Every cell with flowing water, in row-scan order (top row first). Omitted when dry.
+        #[serde(default, skip_serializing_if = "Vec::is_empty")]
+        water: Vec<(i32, i32)>,
+        /// xxh3-64 of the canonical encoding (see `canon`), as 16 lowercase hex digits.
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        hash: Option<String>,
     },
     Overlay {
         tick: u32,
@@ -110,7 +153,24 @@ pub enum ServerMsg {
     Round {
         tick: u32,
         state: RoundState,
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        reason: Option<RoundReason>,
+        /// Seconds left to come back, while paused.
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        seconds: Option<u32>,
     },
+    /// A restart proposal: who proposed it, how long it has left, and how it ended.
+    Vote {
+        by: u8,
+        ticks_left: u32,
+        state: VoteState,
+    },
+}
+
+impl ServerMsg {
+    pub fn round(tick: u32, state: RoundState) -> ServerMsg {
+        ServerMsg::Round { tick, state, reason: None, seconds: None }
+    }
 }
 
 impl ServerMsg {

@@ -23,6 +23,9 @@ namespace Crawler.Input
         /// <summary>Tab: switch to the other leopard, when this client holds both.</summary>
         public Action OnSwitch;
 
+        /// <summary>R: propose restarting the level, or agree to the partner's proposal.</summary>
+        public Action OnVote;
+
         float _accum;
         bool _interactLatched;
         MoveDir _lastPressed = MoveDir.None;
@@ -38,6 +41,7 @@ namespace Crawler.Input
             {
                 if (kb.spaceKey.wasPressedThisFrame) _interactLatched = true;
                 if (kb.tabKey.wasPressedThisFrame) { _lastPressed = MoveDir.None; OnSwitch?.Invoke(); }
+                if (kb.rKey.wasPressedThisFrame) OnVote?.Invoke();
                 if (Pressed(kb.wKey, kb.upArrowKey)) _lastPressed = MoveDir.N;
                 if (Pressed(kb.sKey, kb.downArrowKey)) _lastPressed = MoveDir.S;
                 if (Pressed(kb.dKey, kb.rightArrowKey)) _lastPressed = MoveDir.E;

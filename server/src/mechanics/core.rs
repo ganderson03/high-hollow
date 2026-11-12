@@ -1,19 +1,21 @@
-//! The rules every level has: doors, levers, plates, keys and the summit gate, pits (minor
-//! failures), the sightstone with its hidden pits and false keys, and the goal.
-//! A port of `Crawler.Mock.CoreMechanic`; the design doc is the spec, the mock the reference.
+//! The rules every level has: doors, levers, plates, keys and the summit gate, pits and
+//! chasms, the sightstone with its hidden pits, false keys and disguised ledges, the
+//! checkpoint's look, and the goal. A port of `Crawler.Mock.CoreMechanic`, extended with
+//! the design doc's major failures and the sources other biomes add (rocks on plates, wheels).
 
 use std::collections::{BTreeMap, BTreeSet, HashMap};
 
 use crate::mechanic::Mechanic;
 use crate::protocol::EntityWire;
-use crate::world::{Kind, Perception, SimEvent, World, SEATS};
+use crate::world::{beside, Kind, Perception, SimEvent, World, SEATS};
 
-#[derive(Default)]
+#[derive(Default, Clone)]
 pub struct Core {
     levers_on: BTreeSet<usize>,
-    hidden_pits: Vec<u32>,
+    hidden_pits: Vec<usize>,
+    disguised: Vec<usize>,
     false_keys: Vec<(i32, i32, u8)>,
-    /// Door id -> the lever or plate ids that drive it.
+    /// Door id -> the lever, plate or wheel ids that drive it.
     door_links: BTreeMap<usize, Vec<usize>>,
     linked_sources: BTreeSet<usize>,
     total_keys: usize,
@@ -24,12 +26,23 @@ pub struct Core {
 impl Core {
     fn door_open(&self, w: &World, id: usize) -> bool {
         let door = &w.ents[id];
+        let linked = self.door_links.get(&id);
+        let links_on = || linked.is_some_and(|s| s.iter().any(|&s| self.source_active(w, s)));
+
         if door.glyph == 'F' {
-            return self.total_keys > 0 && w.carried.len() >= self.total_keys;
+            // The summit gate: every key carried, and its links (wheels, levers) if it has any.
+            let mut rules = Vec::new();
+            if self.total_keys > 0 {
+                rules.push(w.carried.len() >= self.total_keys);
+            }
+            if linked.is_some() {
+                rules.push(links_on());
+            }
+            return !rules.is_empty() && rules.iter().all(|&r| r);
         }
         // An explicit link wins over the region rule.
-        if let Some(sources) = self.door_links.get(&id) {
-            return sources.iter().any(|&s| self.source_active(w, s));
+        if linked.is_some() {
+            return links_on();
         }
         let plate_rule = w.level.rule_of(door.region) == "plate";
         let want = if plate_rule { Kind::Plate } else { Kind::Lever };
@@ -40,7 +53,12 @@ impl Core {
 
     fn source_active(&self, w: &World, id: usize) -> bool {
         let e = &w.ents[id];
-        if e.kind == Kind::Lever { self.levers_on.contains(&id) } else { w.seat_at(e.x, e.y) }
+        match e.kind {
+            Kind::Lever => self.levers_on.contains(&id),
+            Kind::Plate => w.seat_at(e.x, e.y) || w.rock_at(e.x, e.y).is_some(),
+            Kind::Wheel => w.turning.contains(&id),
+            _ => false,
+        }
     }
 
     /// The pair wins together: one leopard on the summit marker and the other anywhere in the
@@ -86,15 +104,23 @@ fn number(n: usize) -> String {
 }
 
 impl Mechanic for Core {
-    fn on_load(&mut self, w: &World) -> Result<(), String> {
+    fn name(&self) -> &'static str {
+        "core"
+    }
+
+    fn clone_box(&self) -> Box<dyn Mechanic> {
+        Box::new(self.clone())
+    }
+
+    fn on_load(&mut self, w: &mut World) -> Result<(), String> {
         let mut by_cell = HashMap::new();
         for (id, e) in w.entities() {
             by_cell.insert((e.x, e.y), id);
-            if e.kind == Kind::Key {
-                self.total_keys += 1;
-            }
-            if e.kind == Kind::Hazard && e.glyph == 'h' {
-                self.hidden_pits.push(id as u32);
+            match (e.kind, e.glyph) {
+                (Kind::Key, _) => self.total_keys += 1,
+                (Kind::Hazard, 'h') => self.hidden_pits.push(id),
+                (Kind::Hazard, '-') => self.disguised.push(id),
+                _ => {}
             }
         }
         for (x, y, c) in w.level.scan() {
@@ -111,35 +137,49 @@ impl Mechanic for Core {
             let src = by_cell
                 .get(&link.from)
                 .copied()
-                .filter(|&s| matches!(w.ents[s].kind, Kind::Lever | Kind::Plate))
-                .ok_or_else(|| format!("link from {:?} is not a lever or plate", link.from))?;
+                .filter(|&s| matches!(w.ents[s].kind, Kind::Lever | Kind::Plate | Kind::Wheel))
+                .ok_or_else(|| format!("link from {:?} is not a lever, plate or wheel", link.from))?;
             self.door_links.entry(door).or_default().push(src);
             self.linked_sources.insert(src);
+        }
+        let checkpoints = w.entities().filter(|(_, e)| e.kind == Kind::Checkpoint).count();
+        if checkpoints > 1 {
+            return Err(format!("a level has at most one checkpoint, found {checkpoints}"));
         }
         Ok(())
     }
 
-    fn reset(&mut self, _w: &World) {
-        self.levers_on.clear();
-        self.revealed = false;
-        self.gate_announced = false;
+    fn blocks(&self, w: &World, x: i32, y: i32) -> bool {
+        w.ents_at(x, y).any(|(id, e)| e.kind == Kind::Door && !self.door_open(w, id))
     }
 
-    fn blocks(&self, w: &World, x: i32, y: i32) -> bool {
-        w.entities().any(|(id, e)| e.kind == Kind::Door && (e.x, e.y) == (x, y) && !self.door_open(w, id))
+    /// Rocks go onto floor, plates, pits and chasms; not onto doors or other pieces.
+    fn blocks_rock(&self, w: &World, x: i32, y: i32) -> bool {
+        w.ents_at(x, y).any(|(id, e)| match e.kind {
+            Kind::Door | Kind::Lever | Kind::Goal | Kind::Sightstone | Kind::Checkpoint => true,
+            Kind::Key => !w.carried.contains_key(&id),
+            _ => false,
+        })
     }
 
     fn on_enter(&mut self, w: &mut World, seat: usize, _tick: u32) {
         let (x, y) = w.pos[seat];
-        let here: Vec<usize> = w.entities().filter(|(_, e)| (e.x, e.y) == (x, y)).map(|(id, _)| id).collect();
+        let here: Vec<usize> = w.ents_at(x, y).map(|(id, _)| id).collect();
         for id in here {
             let e = w.ents[id];
             match e.kind {
-                Kind::Hazard => {
-                    w.say(if e.glyph == 'h' && !self.revealed {
-                        "something unseen bites. back to the room's entrance. (a sightstone might help.)"
-                    } else {
-                        "a fall. back to the room's entrance."
+                Kind::Hazard if !w.filled.contains(&id) => {
+                    if e.glyph == 'X' {
+                        w.major_failure("into the chasm.");
+                        return;
+                    }
+                    w.say(match e.glyph {
+                        'h' if !self.revealed => {
+                            "something unseen bites. back to the room's entrance. (a sightstone might help.)"
+                        }
+                        '-' if !self.revealed => "that ledge was only loose scree. back to the room's entrance.",
+                        'a' | 'b' => "a crevasse. back to the room's entrance.",
+                        _ => "a fall. back to the room's entrance.",
                     });
                     w.minor_failure(seat, x, y);
                     if w.carried.len() < self.total_keys {
@@ -166,10 +206,10 @@ impl Mechanic for Core {
     }
 
     fn on_interact(&mut self, w: &mut World, seat: usize, _tick: u32) -> bool {
-        let (px, py) = w.pos[seat];
+        let me = w.pos[seat];
         let target = w
             .entities()
-            .filter(|(_, e)| (e.x - px).abs() <= 1 && (e.y - py).abs() <= 1)
+            .filter(|(_, e)| beside((e.x, e.y), me))
             .find(|(_, e)| e.kind == Kind::Lever || (e.kind == Kind::Sightstone && !self.revealed))
             .map(|(id, e)| (id, e.kind));
         match target {
@@ -192,27 +232,32 @@ impl Mechanic for Core {
 
     fn write(&self, w: &World, out: &mut [EntityWire]) {
         for (id, e) in w.entities() {
-            let state = |on: bool| on as u8;
+            let k = e.kind as u8;
+            let on = |b: bool| b as u8;
             out[id] = match e.kind {
-                Kind::Door => (e.x, e.y, e.kind as u8, state(self.door_open(w, id)), -1),
-                Kind::Lever => (e.x, e.y, e.kind as u8, state(self.levers_on.contains(&id)), -1),
-                Kind::Plate => (e.x, e.y, e.kind as u8, state(w.seat_at(e.x, e.y)), -1),
+                Kind::Door => (e.x, e.y, k, on(self.door_open(w, id)), -1),
+                Kind::Lever => (e.x, e.y, k, on(self.levers_on.contains(&id)), -1),
+                Kind::Plate => (e.x, e.y, k, on(self.source_active(w, id)), -1),
                 Kind::Key => match w.carried.get(&id) {
-                    Some(&s) => (w.pos[s].0, w.pos[s].1, e.kind as u8, 0, s as i8),
-                    None => (e.x, e.y, e.kind as u8, 0, -1),
+                    Some(&s) => (w.pos[s].0, w.pos[s].1, k, 0, s as i8),
+                    None => (e.x, e.y, k, 0, -1),
                 },
-                Kind::Goal => (e.x, e.y, e.kind as u8, state(w.won), -1),
-                Kind::Sightstone => (e.x, e.y, e.kind as u8, state(self.revealed), -1),
-                Kind::Hazard | Kind::Player => (e.x, e.y, e.kind as u8, 0, -1),
+                Kind::Goal => (e.x, e.y, k, on(w.won), -1),
+                Kind::Sightstone => (e.x, e.y, k, on(self.revealed), -1),
+                Kind::Hazard => (e.x, e.y, k, on(w.filled.contains(&id)), -1),
+                Kind::Checkpoint => (e.x, e.y, k, on(w.checkpoint_lit), -1),
+                _ => continue,
             };
         }
     }
 
-    fn perceive(&self, _w: &World, _seat: usize, p: &mut Perception) {
+    fn perceive(&self, w: &World, _seat: usize, p: &mut Perception) {
         if self.revealed {
             return;
         }
-        p.hidden.extend(&self.hidden_pits);
+        p.hidden.extend(self.hidden_pits.iter().filter(|id| !w.filled.contains(id)).map(|&id| id as u32));
+        p.substituted
+            .extend(self.disguised.iter().filter(|id| !w.filled.contains(id)).map(|&id| (id as u32, Kind::Ledge as u8)));
         p.phantoms.extend(&self.false_keys);
     }
 }

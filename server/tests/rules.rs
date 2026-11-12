@@ -58,7 +58,7 @@ fn every_shipped_level_parses_and_loads() {
 fn entity_ids_follow_the_mocks_order() {
     // Seats first, then row-scan from the top row, as Crawler.Mock.MockWorld does.
     let sim = Sim::new(common::level("foothills-1")).unwrap();
-    let snap = sim.snapshot();
+    let snap = sim.snapshot().0;
     assert_eq!(snap[0], (3, 4, Kind::Player as u8, 0, -1)); // P
     assert_eq!(snap[1], (3, 3, Kind::Player as u8, 0, -1)); // 1
     // Row 2 (y = 6) holds the first lever at column 10.
@@ -132,12 +132,12 @@ fn linked_lever_opens_its_door_and_shuts_it_again() {
     );
     let mut t = 0;
     let door = 3; // P, 1, then L (id 2), D (id 3)
-    assert_eq!(sim.snapshot()[door].3, 0);
+    assert_eq!(sim.snapshot().0[door].3, 0);
     interact(&mut sim, &mut t, 0);
-    assert_eq!(sim.snapshot()[door].3, 1);
+    assert_eq!(sim.snapshot().0[door].3, 1);
     assert_eq!(says(&mut sim), ["*clunk*. stone grinds open nearby."]);
     interact(&mut sim, &mut t, 0);
-    assert_eq!(sim.snapshot()[door].3, 0);
+    assert_eq!(sim.snapshot().0[door].3, 0);
     assert_eq!(says(&mut sim), ["*clunk*. a door slides shut."]);
 }
 
@@ -162,12 +162,12 @@ fn a_plate_holds_its_door_only_while_occupied() {
     let mut t = 0;
     let door = 3; // P, 1, B (2), D (3)
     assert!(walk(&mut sim, &mut t, 0, Move::E));
-    assert_eq!(sim.snapshot()[door].3, 0);
+    assert_eq!(sim.snapshot().0[door].3, 0);
     assert!(walk(&mut sim, &mut t, 0, Move::E));
-    assert_eq!(sim.snapshot()[2].3, 1, "plate pressed");
-    assert_eq!(sim.snapshot()[door].3, 1);
+    assert_eq!(sim.snapshot().0[2].3, 1, "plate pressed");
+    assert_eq!(sim.snapshot().0[door].3, 1);
     assert!(walk(&mut sim, &mut t, 0, Move::E));
-    assert_eq!(sim.snapshot()[door].3, 0, "door shuts when the plate is left");
+    assert_eq!(sim.snapshot().0[door].3, 0, "door shuts when the plate is left");
 }
 
 #[test]
@@ -181,11 +181,11 @@ fn a_pit_returns_the_leopard_to_its_rooms_entrance_and_drops_its_keys() {
     assert!(walk(&mut sim, &mut t, 0, Move::N)); // onto E
     assert!(walk(&mut sim, &mut t, 0, Move::E));
     assert!(walk(&mut sim, &mut t, 0, Move::E)); // pick up the key
-    assert_eq!(sim.snapshot()[key], (3, 2, Kind::Key as u8, 0, 0));
+    assert_eq!(sim.snapshot().0[key], (3, 2, Kind::Key as u8, 0, 0));
     assert_eq!(says(&mut sim), ["key 1 of 1.", "the summit gate answers the key."]);
     assert!(walk(&mut sim, &mut t, 0, Move::E)); // into the pit
     assert_eq!(sim.world.pos[0], (1, 2), "back at the room's entrance");
-    assert_eq!(sim.snapshot()[key], (3, 2, Kind::Key as u8, 0, -1), "key back where it lay");
+    assert_eq!(sim.snapshot().0[key], (3, 2, Kind::Key as u8, 0, -1), "key back where it lay");
     assert_eq!(
         says(&mut sim),
         ["a fall. back to the room's entrance.", "the key slips loose and lands back where it lay."]
@@ -199,9 +199,9 @@ fn the_summit_gate_opens_when_every_key_is_carried() {
     let mut t = 0;
     let gate = 3; // P, 1, then the top row: K (2), F (3); then K (4)
     assert!(walk(&mut sim, &mut t, 0, Move::E));
-    assert_eq!(sim.snapshot()[gate].3, 0, "one key of two");
+    assert_eq!(sim.snapshot().0[gate].3, 0, "one key of two");
     assert!(walk(&mut sim, &mut t, 1, Move::E));
-    assert_eq!(sim.snapshot()[gate].3, 1);
+    assert_eq!(sim.snapshot().0[gate].3, 1);
     assert!(says(&mut sim).contains(&"the summit gate answers the two keys.".to_string()));
 }
 
@@ -221,7 +221,7 @@ fn the_summit_needs_both_leopards() {
         walk(&mut sim, &mut t, 1, Move::E);
     }
     assert!(sim.won(), "partner in the summit's room");
-    assert_eq!(sim.snapshot()[2].3, 1, "goal shows won");
+    assert_eq!(sim.snapshot().0[2].3, 1, "goal shows won");
     assert!(!walk(&mut sim, &mut t, 1, Move::E), "nothing moves after a win");
 }
 
@@ -235,7 +235,7 @@ fn the_sightstone_reveals_hidden_pits_and_false_keys() {
     interact(&mut sim, &mut t, 0);
     assert_eq!(sim.perception(0), Default::default());
     assert!(sim.drain_events().contains(&SimEvent::Perception));
-    assert_eq!(sim.snapshot()[2].3, 1, "sightstone used");
+    assert_eq!(sim.snapshot().0[2].3, 1, "sightstone used");
 }
 
 #[test]
@@ -250,7 +250,7 @@ fn a_held_direction_steps_once_per_step_ticks() {
 
 #[test]
 fn unknown_mechanics_are_refused() {
-    let lvl = Level::parse(r##"{"id":"t","rows":["#P1#"],"mechanics":["ice"]}"##).unwrap();
+    let lvl = Level::parse(r##"{"id":"t","rows":["#P1#"],"mechanics":["lava"]}"##).unwrap();
     assert!(Sim::new(lvl).is_err());
 }
 

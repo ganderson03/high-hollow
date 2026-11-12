@@ -93,9 +93,13 @@ fn two_clients_share_the_trail_and_a_third_gets_no_welcome() {
     let mut c = Client::connect(addr, "third");
     assert_eq!(c.next(), None, "the third connection is closed without a welcome");
 
-    // When one leaves, the other is handed both leopards.
+    // When one leaves the world pauses for them; when they come back it resumes.
     drop(b);
-    a.until(|v| v["t"] == "seats" && v["yours"] == serde_json::json!([0, 1]));
+    a.until(|v| v["t"] == "round" && v["state"] == "paused" && v["seconds"] == 60);
+    let mut b = Client::connect(addr, "pine");
+    assert_eq!(b.until(|v| v["t"] == "seats")["yours"], serde_json::json!([1]));
+    a.until(|v| v["t"] == "round" && v["state"] == "playing");
+    a.until(|v| v["t"] == "snapshot");
 }
 
 #[test]
