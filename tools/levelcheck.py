@@ -47,7 +47,10 @@ def region_at(regions, x, y):
     return -1
 
 
-def analyse(path, max_states=3_000_000):
+MAX_STATES = 10_000_000  # High Hollow needs about 5M
+
+
+def analyse(path, max_states=MAX_STATES):
     d, w, h, tiles, regions, links, errs = load(path)
     at = lambda x, y: tiles.get((x, y), "#")
 
@@ -216,7 +219,10 @@ if __name__ == "__main__":
         for e in dict.fromkeys(errs):
             print("  ERROR", e)
         if duo is None:
-            print(f"  UNSOLVABLE (searched {states} states)")
+            if states > MAX_STATES:
+                print(f"  NO WIN FOUND within {MAX_STATES} states (search capped; not proven unsolvable)")
+            else:
+                print(f"  UNSOLVABLE (searched all {states} states)")
         else:
             actions, switches, _ = duo
             print(f"  solvable: shortest {actions} actions (~{actions * 0.15:.0f}s of pure input), {states} states searched")

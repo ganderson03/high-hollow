@@ -2,7 +2,7 @@
 
 A networked two-player co-op puzzle crawler, drawn like a 1970s national park poster. A pair of snow leopards works its way up a trail of levels, holding doors open for each other, fetching keys, and reaching each summit together.
 
-This repository is the **Unity client**. The authoritative simulation is a Rust server that is still being built. Until it exists, a mock feed built into the client stands in for it, so the game is fully playable offline.
+This repository holds the **Unity client** and, under [`server/`](server/README.md), the authoritative **Rust server**. The server's first cut plays the Foothills trail for one or two players. A mock feed built into the client runs the same rules, so the game is also fully playable offline.
 
 Current version: **v0.3.0** (see [Versioning](#versioning)).
 
@@ -18,7 +18,7 @@ Current version: **v0.3.0** (see [Versioning](#versioning)).
 2. Open `Assets/Scenes/Crawler.unity`.
 3. Press Play, then **Enter** on the title screen to set out.
 
-By default the client runs against the mock feed and needs no server.
+By default the client runs against the mock feed and needs no server. To play against the real server, run `cargo run --release` in `server/` (see [server/README.md](server/README.md)), untick `useMockFeed` on `Bootstrap`, and press Play.
 
 ### Bootstrap settings
 
@@ -140,12 +140,12 @@ An entity is `[x, y, kind, state, carried_by]`, where `carried_by` is `-1` when 
 
 Overlay entries are `substituted: [id, look]` and `phantoms: [x, y, look]`, where a look is an appearance key (the kind values above).
 
-**Not yet agreed with the Rust server.** These are client-side conventions until the server settles them:
+**Settled by the Rust server (v0.1.0).** These began as client-side conventions; the server now implements them:
 
-- Seat N is the Nth Player entity; the mock always gives its one client both seats.
-- `level` and `round` are client additions to the original protocol.
-- Chat from sender `255` is shown as the server.
-- The overlay's look key was called `sprite` in early notes, from a 2D plan.
+- Seat N is the Nth Player entity (entity id N). One client alone holds both seats; two hold one each.
+- `level` and `round` are part of the protocol, sent as in the mock.
+- Chat from sender `255` is the server. Player chat is stamped with the sender's real `client_id`.
+- The overlay's look key is the kind value (it was called `sprite` in early notes, from a 2D plan).
 
 Canonical encoding and xxh3 hash parity with the server are planned, not implemented.
 
@@ -168,7 +168,8 @@ A door opens by its **links** if it has any: `"links": [{ "from": [col, row], "t
 
 ### Tools
 
-- `python tools/levelcheck.py <level.json>...` validates a level and **solves** it with the same rules as the mock: it reports the shortest winning route and how often control passes between the two leopards on it. Every shipped level must solve.
+- `python tools/levelcheck.py <level.json>...` validates a level and **solves** it with the same rules as the mock: it reports the shortest winning route and how often control passes between the two leopards on it. Every shipped level must solve. The search stops at 10M states (High Hollow needs about 5M) and says so rather than calling the level unsolvable.
+- `python tools/export_routes.py [ids...]` writes those shortest routes to `server/tests/routes/`, where the server's tests replay them. Rerun it after changing a level.
 - `python tools/build_foothills.py` regenerates the Foothills level files from code, where rooms, pieces and links are placed by coordinate rather than by hand-editing the map.
 
 ## Editor tools
