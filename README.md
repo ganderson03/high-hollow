@@ -20,6 +20,23 @@ Current version: **v0.3.0** (see [Versioning](#versioning)).
 
 By default the client runs against the mock feed and needs no server. To play against the real server, run `cargo run --release` in `server/` (see [server/README.md](server/README.md)), untick `useMockFeed` on `Bootstrap`, and press Play.
 
+### Two players and the server, in one command
+
+```powershell
+.\play.ps1
+```
+
+Or double-click `play.cmd`. The script builds the Rust server, and also builds the Unity player when there is none or the client has changed since the last build. It then starts the server in its own window and opens two game windows side by side, one per leopard, that join on their own. Closing both game windows stops the server. The Unity editor must be closed while the script builds the player.
+
+| Option | |
+| --- | --- |
+| `-Players 1` | one window holding both leopards |
+| `-Level hollow` | start the trail on another level |
+| `-Build` / `-NoBuild` | force a Unity rebuild, or never build |
+| `-Port 7778` | use another port |
+
+Logs go to `Builds/logs/`. A built player also takes these on its command line: `-server host[:port]`, `-mock`, `-name NAME`, `-level ID` (mock only), `-autostart` (skip the title card) and `-window-x X -window-y Y`.
+
 ### Bootstrap settings
 
 The `Bootstrap` object in the scene holds the switches you are likely to touch:

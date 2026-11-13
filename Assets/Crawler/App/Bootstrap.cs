@@ -52,9 +52,11 @@ namespace Crawler.App
         float _roundStart;
         bool _won;
         bool _choosing; // the partner did not come back: B takes both leopards, Q leaves
+        bool _autostart;
 
         void Start()
         {
+            ApplyCommandLine();
             Art.Style = artStyle; // read by the view layers as they build
             ProcCursor.Apply();
 
@@ -74,6 +76,56 @@ namespace Crawler.App
             status.Set(LinkStatus.Idle, "press Enter to begin");
 
             _poster.Show(Typeset.Spaced(gameTitle), tagline, "press  ENTER  to set out", true, StartLink, instant: true);
+            if (_autostart)
+            {
+                _poster.Hide();
+                StartLink();
+            }
+        }
+
+        /// <summary>
+        /// Overrides for a built player, so a script can start several clients against one server
+        /// without editing the scene (see play.ps1):
+        ///   -server host[:port]   play against a server instead of the mock
+        ///   -mock                 play against the built-in mock
+        ///   -name NAME            the name sent in hello
+        ///   -level ID             the level the mock starts on
+        ///   -autostart            skip the title card
+        ///   -window-x X -window-y Y   move the window (players only)
+        /// </summary>
+        void ApplyCommandLine()
+        {
+            var args = System.Environment.GetCommandLineArgs();
+            int? wx = null, wy = null;
+            for (int i = 1; i < args.Length; i++)
+            {
+                string next = i + 1 < args.Length ? args[i + 1] : null;
+                switch (args[i])
+                {
+                    case "-server" when next != null:
+                        i++;
+                        useMockFeed = false;
+                        int colon = next.LastIndexOf(':');
+                        if (colon > 0 && int.TryParse(next.Substring(colon + 1), out int p)) { host = next.Substring(0, colon); port = p; }
+                        else host = next;
+                        break;
+                    case "-mock": useMockFeed = true; break;
+                    case "-name" when next != null: playerName = next; i++; break;
+                    case "-level" when next != null: mockLevelId = next; i++; break;
+                    case "-autostart": _autostart = true; break;
+                    case "-window-x" when int.TryParse(next, out int x): wx = x; i++; break;
+                    case "-window-y" when int.TryParse(next, out int y): wy = y; i++; break;
+                }
+            }
+
+            // Two windows on one machine: the one without focus must keep pumping the link.
+            if (!useMockFeed) Application.runInBackground = true;
+
+            if (!Application.isEditor && (wx.HasValue || wy.HasValue))
+            {
+                var at = Screen.mainWindowPosition;
+                Screen.MoveMainWindowTo(Screen.mainWindowDisplayInfo, new Vector2Int(wx ?? at.x, wy ?? at.y));
+            }
         }
 
         bool PosterBlocking() => _poster.IsShowing || _poster.LastDismissFrame == Time.frameCount;
