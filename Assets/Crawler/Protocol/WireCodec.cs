@@ -66,7 +66,22 @@ namespace Crawler.Protocol
                         return true;
 
                     case "round":
-                        handler.OnRound(new RoundMsg { Tick = (uint)o["tick"], State = RoundFromWire((string)o["state"]) });
+                        handler.OnRound(new RoundMsg
+                        {
+                            Tick = (uint)o["tick"],
+                            State = RoundFromWire((string)o["state"]),
+                            Reason = (string)o["reason"],
+                            Seconds = o["seconds"] != null ? (int)o["seconds"] : 0,
+                        });
+                        return true;
+
+                    case "vote":
+                        handler.OnVote(new VoteMsg
+                        {
+                            By = (byte)o["by"],
+                            TicksLeft = (int)o["ticks_left"],
+                            State = VoteFromWire((string)o["state"]),
+                        });
                         return true;
 
                     default:
@@ -93,7 +108,10 @@ namespace Crawler.Protocol
                 if (e.Count != 5) throw new FormatException($"entity {i} has {e.Count} fields, expected 5");
                 ents[i] = new EntityState((int)e[0], (int)e[1], (EntityKind)(byte)e[2], (byte)e[3], (sbyte)e[4]);
             }
-            return new Snapshot { Tick = (uint)o["tick"], Entities = ents };
+            var water = (JArray)o["water"] ?? new JArray();
+            var cells = new Cell[water.Count];
+            for (int i = 0; i < cells.Length; i++) cells[i] = new Cell((int)water[i][0], (int)water[i][1]);
+            return new Snapshot { Tick = (uint)o["tick"], Entities = ents, Water = cells, Hash = (string)o["hash"] };
         }
 
         static Overlay DecodeOverlay(JObject o)
@@ -128,6 +146,12 @@ namespace Crawler.Protocol
                 Field(w, "move", MoveToWire(m.Move));
                 w.WritePropertyName("interact"); w.WriteValue(m.Interact);
             });
+
+        public static string EncodeVote(bool reset) =>
+            Write(w => { Field(w, "t", "vote"); w.WritePropertyName("reset"); w.WriteValue(reset); });
+
+        public static string EncodeChoice(ChoicePick pick) =>
+            Write(w => { Field(w, "t", "choice"); Field(w, "pick", pick == ChoicePick.Quit ? "quit" : "both"); });
 
         public static string EncodeChat(byte from, string text) =>
             Write(w =>
@@ -192,7 +216,18 @@ namespace Crawler.Protocol
             {
                 Field(w, "t", "round");
                 w.WritePropertyName("tick"); w.WriteValue(m.Tick);
-                Field(w, "state", m.State == RoundState.Won ? "won" : "playing");
+                Field(w, "state", RoundToWire(m.State));
+                if (m.Reason != null) Field(w, "reason", m.Reason);
+                if (m.State == RoundState.Paused) { w.WritePropertyName("seconds"); w.WriteValue(m.Seconds); }
+            });
+
+        public static string EncodeVoteMsg(VoteMsg m) =>
+            Write(w =>
+            {
+                Field(w, "t", "vote");
+                w.WritePropertyName("by"); w.WriteValue(m.By);
+                w.WritePropertyName("ticks_left"); w.WriteValue(m.TicksLeft);
+                Field(w, "state", m.State == VoteState.Open ? "open" : m.State == VoteState.Passed ? "passed" : "lapsed");
             });
 
         public static string EncodeSeats(SeatsMsg m) =>
@@ -215,7 +250,31 @@ namespace Crawler.Protocol
             {
                 case "playing": return RoundState.Playing;
                 case "won": return RoundState.Won;
+                case "paused": return RoundState.Paused;
+                case "choose": return RoundState.Choose;
                 default: throw new FormatException("unknown round state: " + s);
+            }
+        }
+
+        static string RoundToWire(RoundState s)
+        {
+            switch (s)
+            {
+                case RoundState.Won: return "won";
+                case RoundState.Paused: return "paused";
+                case RoundState.Choose: return "choose";
+                default: return "playing";
+            }
+        }
+
+        static VoteState VoteFromWire(string s)
+        {
+            switch (s)
+            {
+                case "open": return VoteState.Open;
+                case "passed": return VoteState.Passed;
+                case "lapsed": return VoteState.Lapsed;
+                default: throw new FormatException("unknown vote state: " + s);
             }
         }
 

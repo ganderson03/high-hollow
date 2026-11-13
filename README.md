@@ -2,7 +2,7 @@
 
 A networked two-player co-op puzzle crawler, drawn like a 1970s national park poster. A pair of snow leopards works its way up a trail of levels, holding doors open for each other, fetching keys, and reaching each summit together.
 
-This repository is the **Unity client**. The authoritative simulation is a Rust server that is still being built. Until it exists, a mock feed built into the client stands in for it, so the game is fully playable offline.
+This repository holds the **Unity client** and, under [`server/`](server/README.md), the authoritative **Rust server**. The server runs every rule in the design doc for one or two players: the Foothills trail, the five biome mechanics still waiting for levels, both failure grades, the vote reset, checkpoints and the disconnect pause. A mock feed built into the client runs the same rules, so the game is also fully playable offline.
 
 Current version: **v0.3.0** (see [Versioning](#versioning)).
 
@@ -18,7 +18,24 @@ Current version: **v0.3.0** (see [Versioning](#versioning)).
 2. Open `Assets/Scenes/Crawler.unity`.
 3. Press Play, then **Enter** on the title screen to set out.
 
-By default the client runs against the mock feed and needs no server.
+By default the client runs against the mock feed and needs no server. To play against the real server, run `cargo run --release` in `server/` (see [server/README.md](server/README.md)), untick `useMockFeed` on `Bootstrap`, and press Play.
+
+### Two players and the server, in one command
+
+```powershell
+.\play.ps1
+```
+
+Or double-click `play.cmd`. The script builds the Rust server, and also builds the Unity player when there is none or the client has changed since the last build. It then starts the server in its own window and opens two game windows side by side, one per leopard, that join on their own. Closing both game windows stops the server. The Unity editor must be closed while the script builds the player.
+
+| Option | |
+| --- | --- |
+| `-Players 1` | one window holding both leopards |
+| `-Level hollow` | start the trail on another level |
+| `-Build` / `-NoBuild` | force a Unity rebuild, or never build |
+| `-Port 7778` | use another port |
+
+Logs go to `Builds/logs/`. A built player also takes these on its command line: `-server host[:port]`, `-mock`, `-name NAME`, `-level ID` (mock only), `-autostart` (skip the title card) and `-window-x X -window-y Y`.
 
 ### Bootstrap settings
 
@@ -42,6 +59,8 @@ The committed scene uses **Placeholder** art. Switch `artStyle` to **Poster** be
 | Space | Interact with an adjacent lever or sightstone |
 | Tab | Switch to your other leopard, when you hold both |
 | Enter | Open chat, send a message |
+| R | Propose restarting the level, or agree to your partner's proposal |
+| B / Q | When your partner has not come back: take both leopards / leave the trail |
 
 ## How the trail plays
 
@@ -107,7 +126,11 @@ JSON Lines over TCP: one JSON object per line, discriminated by `t`.
 
 ```json
 {"t":"control","seat":1}
+{"t":"vote","reset":true}
+{"t":"choice","pick":"both"}
 ```
+
+`vote` proposes restarting the level or agrees to the partner's proposal (`false` withdraws or declines). `choice` answers `round` `choose`, after a partner has been gone a minute, with `both` or `quit`.
 
 A client holding both seats asks to steer the other leopard; the server answers with `seats`.
 
@@ -137,17 +160,26 @@ An entity is `[x, y, kind, state, carried_by]`, where `carried_by` is `-1` when 
 | Hazard | 5 | unused |
 | Goal | 6 | 1 = won |
 | Sightstone | 7 | 1 = used |
+| Ledge | 8 | 0 intact, 1 cracked, 2 collapsed |
+| Boulder | 9 | shape (0 boulder, 1 slab along x, 2 slab along y), +4 straining, +8 gone |
+| Sluice | 10 | open exit: 0 n, 1 e, 2 s, 3 w |
+| Wheel | 11 | 1 = turning |
+| Checkpoint | 12 | 1 = lit |
+
+A Hazard's `state` is 1 once a boulder has filled it.
+
+The server also sends `round` with `state` `paused` (and `seconds`) or `choose` while a partner is gone, and a `reason` of `fell`, `vote` or `partner_left` on a round that is not a fresh level; `{"t":"vote","by":0,"ticks_left":600,"state":"open"}`, then `passed` or `lapsed`; and on `snapshot`, `water` (flowing cells as `[x, y]`, omitted when dry) and `hash`. See [server/README.md](server/README.md#wire-additions).
 
 Overlay entries are `substituted: [id, look]` and `phantoms: [x, y, look]`, where a look is an appearance key (the kind values above).
 
-**Not yet agreed with the Rust server.** These are client-side conventions until the server settles them:
+**Settled by the Rust server.** These began as client-side conventions; the server now implements them:
 
-- Seat N is the Nth Player entity; the mock always gives its one client both seats.
-- `level` and `round` are client additions to the original protocol.
-- Chat from sender `255` is shown as the server.
-- The overlay's look key was called `sprite` in early notes, from a 2D plan.
+- Seat N is the Nth Player entity (entity id N). One client alone holds both seats; two hold one each.
+- `level` and `round` are part of the protocol, sent as in the mock.
+- Chat from sender `255` is the server. Player chat is stamped with the sender's real `client_id`.
+- The overlay's look key is the kind value (it was called `sprite` in early notes, from a 2D plan).
 
-Canonical encoding and xxh3 hash parity with the server are planned, not implemented.
+Each snapshot's `hash` is XXH3-64 of a fixed binary encoding of its tick, entities and water ([server/README.md](server/README.md#wire-additions)). The client decodes it but does not check it yet.
 
 ## Levels
 
@@ -162,13 +194,17 @@ Levels are JSON in `Assets/StreamingAssets/levels/{id}.json`: a name, a biome, a
 | `D` | door | `H` | pit |
 | `F` | summit gate | `h` | hidden pit |
 | `G` | summit | `S` | sightstone |
-| `E` | room entrance, where a fallen leopard returns | | |
+| `E` | room entrance, where a fallen leopard returns | `X` | chasm (major: the level restarts) |
+| `C` | checkpoint (finales) | `-` | pit that looks like a ledge until the sightstone |
+
+Biome glyphs, each needing its mechanic in the level's `"mechanics"` list: `=` ledge (`ledges`); `~` ice and `%` open water (`ice`); `O` boulder, `[` `]` and `v` `^` slabs (`boulders`); `w` channel, `W` source, `V` sluice, `M` mill wheel (`water`); `a` / `b` crevasses seen only by leopard 0 / 1, and `y` / `z` false crevasses shown only to leopard 0 / 1 (`sight`). A level may list `"ice": [[col, row], ...]` for ice under a piece. The rules are in [server/README.md](server/README.md#rules).
 
 A door opens by its **links** if it has any: `"links": [{ "from": [col, row], "to": [col, row] }]`, written as column and row exactly as they read in `rows`, from a lever or plate to a door. A door with no links falls back to its region's rule: its region's plate in a `plate` region, its region's lever otherwise. The summit gate `F` opens when every key is carried.
 
 ### Tools
 
-- `python tools/levelcheck.py <level.json>...` validates a level and **solves** it with the same rules as the mock: it reports the shortest winning route and how often control passes between the two leopards on it. Every shipped level must solve.
+- `python tools/levelcheck.py <level.json>...` validates a level and **solves** it with the same rules as the mock: it reports the shortest winning route and how often control passes between the two leopards on it. Every shipped level must solve. The search stops at 10M states (High Hollow needs about 5M) and says so rather than calling the level unsolvable.
+- `python tools/export_routes.py [ids...]` writes those shortest routes to `server/tests/routes/`, where the server's tests replay them. Rerun it after changing a level.
 - `python tools/build_foothills.py` regenerates the Foothills level files from code, where rooms, pieces and links are placed by coordinate rather than by hand-editing the map.
 
 ## Editor tools

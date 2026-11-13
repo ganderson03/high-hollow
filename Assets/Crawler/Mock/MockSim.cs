@@ -37,7 +37,7 @@ namespace Crawler.Mock
         }
 
         /// <summary>Put the level back to its start: both leopards home, no keys, every mechanic reset.</summary>
-        public void Restart(uint tick)
+        public void Restart(uint tick, string reason = null)
         {
             for (int s = 0; s < MockWorld.Seats; s++)
             {
@@ -50,7 +50,7 @@ namespace Crawler.Mock
             _move = MoveDir.None;
             _interact = false;
             Out.Enqueue(WireCodec.EncodeOverlay(Perception(tick)));
-            Out.Enqueue(WireCodec.EncodeRound(new RoundMsg { Tick = tick, State = RoundState.Playing }));
+            Out.Enqueue(WireCodec.EncodeRound(new RoundMsg { Tick = tick, State = RoundState.Playing, Reason = reason }));
             Out.Enqueue(WireCodec.EncodeSeats(Seats()));
         }
 

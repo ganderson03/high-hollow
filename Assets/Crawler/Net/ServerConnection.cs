@@ -103,6 +103,10 @@ namespace Crawler.Net
 
         public void SendControl(int seat) => SendLine(WireCodec.EncodeControl(seat));
 
+        public void SendVote(bool reset) => SendLine(WireCodec.EncodeVote(reset));
+
+        public void SendChoice(ChoicePick pick) => SendLine(WireCodec.EncodeChoice(pick));
+
         void SendLine(string line)
         {
             if (!_connected)
@@ -162,6 +166,7 @@ namespace Crawler.Net
             public void OnLevel(LevelMsg m) => _inner.OnLevel(m);
             public void OnRound(RoundMsg m) => _inner.OnRound(m);
             public void OnSeats(SeatsMsg m) => _inner.OnSeats(m);
+            public void OnVote(VoteMsg m) => _inner.OnVote(m);
             public void OnStatus(LinkStatus s, string d) => _inner.OnStatus(s, d);
         }
     }

@@ -126,6 +126,20 @@ namespace Crawler.Mock
 
         public void SendChat(string text) => _lines.Enqueue(WireCodec.EncodeChat(LocalClientId, text));
 
+        /// <summary>The mock's one client holds both seats, so a restart proposal passes at once.</summary>
+        public void SendVote(bool reset)
+        {
+            if (!reset || _sim.Won) return;
+            uint tick = (uint)(_clock.ElapsedMilliseconds * TickHz / 1000);
+            _lines.Enqueue(WireCodec.EncodeVoteMsg(new VoteMsg { By = LocalClientId, TicksLeft = 0, State = VoteState.Passed }));
+            Say("agreed: the level starts over.");
+            _sim.Restart(tick, "vote");
+            Drain();
+        }
+
+        /// <summary>The mock has no partner to lose, so it never asks for a choice.</summary>
+        public void SendChoice(ChoicePick pick) { }
+
         public void SendControl(int seat)
         {
             _sim.SetActive(seat, (uint)(_clock.ElapsedMilliseconds * TickHz / 1000));
