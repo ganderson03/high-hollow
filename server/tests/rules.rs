@@ -259,6 +259,9 @@ fn the_sightstone_reveals_hidden_pits_and_false_keys() {
     // Only the leopard that touched it sees the truth; its partner still sees the lie.
     assert_eq!(sim.perception(1), p, "the partner's sight is unchanged");
     assert!(walk(&mut sim, &mut t, 0, Move::E));
+    assert_eq!(sim.perception(0), p, "stepping off ends the sight");
+    assert!(sim.drain_events().contains(&SimEvent::Perception), "and the overlay is sent again");
+    assert_eq!(sim.snapshot().0[2].3, 0, "the stone goes dark");
     assert!(walk(&mut sim, &mut t, 1, Move::E));
     assert!(walk(&mut sim, &mut t, 1, Move::N));
     interact(&mut sim, &mut t, 1);

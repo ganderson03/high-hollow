@@ -115,6 +115,11 @@ namespace Crawler.Mock
                 m.OnEnter(World, seat, tick);
                 if (World.Pos[seat] != (x, y)) break; // a fall moved the leopard; nothing else happens here
             }
+            if (World.PerceptionChanged)
+            {
+                World.PerceptionChanged = false;
+                Out.Enqueue(WireCodec.EncodeOverlay(Perception(tick)));
+            }
         }
 
         /// <summary>The leopards' positions, then each mechanic writes its pieces' states.</summary>

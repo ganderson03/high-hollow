@@ -194,7 +194,7 @@ def cairn_fields():
                 m.put(c, r, "h")
     m.put(*false_key, "k")                # the false key, in plain sight
     m.put(23, 7, "K")                     # the real key, deep in the nook
-    m.region("East Nook", "not all is shown  ·  stand on the sightstone, Space", "sight", 20, 7, 23, 14)
+    m.region("East Nook", "not all is shown  ·  stand on the sightstone, Space, and stay", "sight", 20, 7, 23, 14)
 
     # Summit gate in the field's north wall.
     m.put(12, 5, "F")

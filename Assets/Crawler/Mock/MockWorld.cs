@@ -31,6 +31,9 @@ namespace Crawler.Mock
         public readonly Queue<string> Out;
 
         public bool Won;
+        /// <summary>Set by a mechanic when what a player sees has changed outside an interact (stepping off
+        /// a sightstone); the sim sends a fresh overlay and clears it.</summary>
+        public bool PerceptionChanged;
         public int FirstEntity => Seats; // entity ids 0 and 1 are the seats
 
         /// <summary>Creates the seats, then one entity per piece glyph in row-scan order. Entity ids come from this
