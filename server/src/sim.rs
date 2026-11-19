@@ -28,18 +28,6 @@
 //! because two people can press keys at the same moment, so the order in which they act has to
 //! be fixed: seat 0 first, then seat 1, which sees seat 0's result.
 //!
-//! ## What one tick does
-//!
-//! 1. **Each seat, in seat order**: if it is sliding on ice, the slide continues and input is
-//!    ignored; otherwise it interacts (a lever, a sluice) and then steps, at most once every
-//!    `STEP_TICKS`.
-//! 2. **Settle** after each seat: a major failure restarts the level (or restores the
-//!    checkpoint) and ends the tick; so does a win.
-//! 3. **Every mechanic's `on_tick`**, in the order the level lists them: water re-flows,
-//!    boulders slide, slab pushes expire.
-//! 4. **Settle** again (water arriving can sweep a leopard away).
-//! 5. **The checkpoint** lights if both leopards are on or beside it.
-//!
 //! Timing is counted in ticks, never wall-clock time, so a replay of the same inputs is exact.
 
 use crate::level::Level;
