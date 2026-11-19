@@ -9,7 +9,8 @@ use std::net::TcpListener;
 use std::path::PathBuf;
 use std::process::ExitCode;
 
-use hollow::game::Game;
+use hollow::game::{Game, MAX_CLIENTS, TICKS_PER_SNAPSHOT, TICK_HZ};
+use hollow::{hlog, log};
 use hollow::level::LevelStore;
 use hollow::net;
 
@@ -35,6 +36,7 @@ fn main() -> ExitCode {
 
 /// Parses the options, loads the trail and its first level, binds the port and serves forever.
 fn run() -> Result<(), String> {
+    log::start();
     // Defaults: local only, the port the client expects, the first level of the trail.
     let mut bind = "127.0.0.1".to_string();
     let mut port: u16 = 7777;
@@ -63,13 +65,13 @@ fn run() -> Result<(), String> {
     // about a map.
     let dir = levels.or_else(default_levels_dir).ok_or("no levels directory found; pass --levels")?;
     let store = LevelStore::new(dir);
-    eprintln!("[main] levels from {}", store.dir().display());
+    hlog!("main", "levels from {}", store.dir().display());
 
     // Without a trail the server still runs: it just replays the starting level after a win.
     let trail = match store.trail() {
         Ok(t) => Some(t),
         Err(e) => {
-            eprintln!("[main] {e} (the level will repeat instead of chaining)");
+            hlog!("main", "{e} (the level will repeat instead of chaining)");
             None
         }
     };
@@ -80,7 +82,8 @@ fn run() -> Result<(), String> {
 
     // play.ps1 waits for the "listening on" line before it starts the players.
     let listener = TcpListener::bind((bind.as_str(), port)).map_err(|e| format!("bind {bind}:{port}: {e}"))?;
-    eprintln!("[main] listening on {} (trail starts at {start})", listener.local_addr().map_err(|e| e.to_string())?);
+    hlog!("main", "listening on {} (trail starts at {start})", listener.local_addr().map_err(|e| e.to_string())?);
+    hlog!("main", "{TICK_HZ} ticks a second, a snapshot every {TICKS_PER_SNAPSHOT} ticks; up to {MAX_CLIENTS} players");
     net::serve(listener, game).map_err(|e| e.to_string())
 }
 

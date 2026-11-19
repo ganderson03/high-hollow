@@ -37,6 +37,14 @@ When nothing has changed, both players are in about 5 seconds:
 
 The server's log is kept in `Builds/logs/server.log`, next to `player1.log` and `player2.log`. Pass `-NoLogWindow` to skip the live log window.
 
+Each log line is stamped with the time since the server started and tagged with where it came from: `net` (connections and why they ended), `game` (joins, seat switches, pauses, votes, restarts, each level's start and how long its summit took, all with the level and tick), `chat` (what players type), `say` (what the server tells players, which narrates the level: keys, levers, falls) and `stat` (a summary every 30 s: who is where, keys carried, restarts).
+
+```text
+00:00:01.261 game  [foothills-1 t=0] snep joined as client 0 (conn 1); holds both leopards
+00:00:02.075 game  [foothills-1 t=47] restart #1 after the vote: from the start
+00:00:31.044 stat  [foothills-1 t=1800] 30s in; snep on leopard 0 at (3,4) in The Trailhead; 0 restarts
+```
+
 | Option | |
 | --- | --- |
 | `-Players 1` | one window holding both leopards |

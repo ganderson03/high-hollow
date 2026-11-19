@@ -7,10 +7,12 @@
 //! - `sim`: one level, ticked by the caller.
 //! - `game`: seats, clients, clock and trail; no sockets.
 //! - `net`: TCP threads around a `Game`.
+//! - `log`: the timestamped server log (`hlog!`).
 
 pub mod canon;
 pub mod game;
 pub mod level;
+pub mod log;
 pub mod mechanic;
 pub mod mechanics;
 pub mod net;

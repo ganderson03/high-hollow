@@ -21,6 +21,7 @@ use std::thread;
 use std::time::{Duration, Instant};
 
 use crate::game::{ConnId, Game, Out, TICK_HZ};
+use crate::hlog;
 use crate::protocol::{ClientMsg, MAX_LINE};
 
 /// Lines a client may fall behind by before it is dropped (about 10 s of snapshots).
@@ -58,7 +59,7 @@ fn accept_loop(listener: TcpListener, tx: Sender<NetEvent>) {
         let stream = match stream {
             Ok(s) => s,
             Err(e) => {
-                eprintln!("[net] accept failed: {e}");
+                hlog!("net", "accept failed: {e}");
                 continue;
             }
         };
@@ -68,13 +69,13 @@ fn accept_loop(listener: TcpListener, tx: Sender<NetEvent>) {
         // waiting to be batched.
         let _ = stream.set_nodelay(true);
         let peer = stream.peer_addr().map(|a| a.to_string()).unwrap_or_else(|_| "?".into());
-        eprintln!("[net] conn {id} from {peer}");
+        hlog!("net", "conn {id} from {peer}");
 
         // One handle reads (here), the other writes (handed to the simulation thread).
         let reader = match stream.try_clone() {
             Ok(r) => r,
             Err(e) => {
-                eprintln!("[net] conn {id}: {e}");
+                hlog!("net", "conn {id}: {e}");
                 continue;
             }
         };
@@ -95,10 +96,13 @@ fn read_loop(id: ConnId, stream: TcpStream, tx: Sender<NetEvent>) {
         // Read at most MAX_LINE + 1 bytes, so a client sending one endless line cannot make
         // the server buffer it all.
         match (&mut r).take(MAX_LINE as u64 + 1).read_until(b'\n', &mut buf) {
-            Ok(0) => break, // end of stream: the client closed
+            Ok(0) => {
+                hlog!("net", "conn {id}: the client hung up");
+                break;
+            }
             Ok(_) => {
                 if buf.len() > MAX_LINE && buf.last() != Some(&b'\n') {
-                    eprintln!("[net] conn {id}: line over {MAX_LINE} bytes; closing");
+                    hlog!("net", "conn {id}: line over {MAX_LINE} bytes; closing");
                     break;
                 }
                 let line = String::from_utf8_lossy(&buf).trim().to_string();
@@ -106,7 +110,11 @@ fn read_loop(id: ConnId, stream: TcpStream, tx: Sender<NetEvent>) {
                     return;
                 }
             }
-            Err(_) => break, // reset, or the writer shut the socket
+            Err(e) => {
+                // reset by the client, or the writer shut the socket
+                hlog!("net", "conn {id}: connection lost ({e})");
+                break;
+            }
         }
     }
     let _ = tx.send(NetEvent::Closed(id));
@@ -170,16 +178,15 @@ fn run(mut game: Game, rx: Receiver<NetEvent>) {
                     Ok(_) => {
                         conns.insert(id, Conn { tx });
                     }
-                    Err(e) => eprintln!("[net] conn {id}: {e}"),
+                    Err(e) => hlog!("net", "conn {id}: {e}"),
                 }
             }
             Ok(NetEvent::Line(id, line)) => match ClientMsg::decode(&line) {
                 Ok(msg) => game.handle(id, msg),
                 // A malformed line is logged and ignored, not fatal: clients may be newer.
-                Err(e) => eprintln!("[net] conn {id}: ignored bad line ({e})"),
+                Err(e) => hlog!("net", "conn {id}: ignored bad line ({e})"),
             },
             Ok(NetEvent::Closed(id)) => {
-                eprintln!("[net] conn {id} closed");
                 conns.remove(&id);
                 game.leave(id);
             }
@@ -206,7 +213,7 @@ fn flush(game: &mut Game, conns: &mut HashMap<ConnId, Conn>) {
                     match c.tx.try_send(line) {
                         Ok(()) => {}
                         Err(TrySendError::Full(_)) => {
-                            eprintln!("[net] conn {id} is not keeping up; dropping it");
+                            hlog!("net", "conn {id} is not keeping up ({OUTBOX} messages queued); dropping it");
                             conns.remove(&id);
                             game.leave(id);
                         }

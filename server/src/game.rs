@@ -17,6 +17,7 @@
 //! level, or restores its lit checkpoint, exactly like a major failure.
 
 use crate::canon;
+use crate::hlog;
 use crate::level::{Level, Trail};
 use crate::protocol::{
     clean_text, ClientMsg, Pick, RoundReason, RoundState, ServerMsg, VoteState, MAX_CHAT, MAX_NAME, SERVER_SENDER,
@@ -38,6 +39,8 @@ pub const PAUSE_SECONDS: u32 = 60;
 pub const VOTE_TICKS: u32 = 600;
 /// Two leopards, so at most two players; a third connection is refused.
 pub const MAX_CLIENTS: usize = 2;
+/// A `stat` line goes into the log this often while someone is playing (30 s).
+pub const STATUS_TICKS: u32 = 30 * TICK_HZ;
 
 /// A connection's id, given by the network layer. Not the same as a player's `client_id`
 /// (0 or 1), which is what the protocol shows.
@@ -112,6 +115,9 @@ pub struct Game {
     vote: Option<Vote>,
     /// Inputs stamped before this tick were sent for an earlier round and are dropped.
     round_start: u32,
+    /// The tick the current level began, and how often it has restarted since: for the log.
+    level_began: u32,
+    restarts: u32,
     /// What to send or close; emptied by `take_out`.
     out: Vec<Out>,
 }
@@ -120,7 +126,7 @@ impl Game {
     /// A session waiting at the start of the trail, with nobody connected yet.
     pub fn new(start_level: &str, trail: Option<Trail>, load: Loader) -> Result<Game, String> {
         let sim = Sim::new(load(start_level)?)?;
-        Ok(Game {
+        let game = Game {
             load,
             trail,
             start_level: start_level.to_string(),
@@ -132,8 +138,12 @@ impl Game {
             pause: None,
             vote: None,
             round_start: 0,
+            level_began: 0,
+            restarts: 0,
             out: Vec::new(),
-        })
+        };
+        game.log_level();
+        Ok(game)
     }
 
     /// The current simulation tick. It stops advancing while nobody is connected or the world
@@ -193,6 +203,7 @@ impl Game {
                 let text = clean_text(&text, MAX_CHAT);
                 if !text.is_empty() {
                     let from = self.clients[ci].id;
+                    hlog!("chat", "[{}] {}: {text}", self.level_id(), self.clients[ci].name);
                     self.broadcast(&ServerMsg::Chat { from, text });
                 }
             }
@@ -203,6 +214,7 @@ impl Game {
                     return;
                 }
                 self.sim.release(c.active);
+                self.log(format_args!("{} switches to leopard {seat}", c.name));
                 self.clients[ci].active = seat;
                 self.send_seats(ci);
                 self.send_overlay(ci);
@@ -213,12 +225,14 @@ impl Game {
                 }
                 match pick {
                     Pick::Both => {
+                        self.log(format_args!("{} takes both leopards and plays on alone", self.clients[ci].name));
                         self.pause = None;
                         self.rebalance(None);
                         self.resume(None);
                         self.say("you hold both leopards now: Tab switches between them.");
                     }
                     Pick::Quit => {
+                        self.log(format_args!("{} leaves the trail rather than play on alone", self.clients[ci].name));
                         self.out.push(Out::Close(conn));
                         self.leave(conn);
                     }
@@ -238,7 +252,7 @@ impl Game {
     /// partner, the newcomer takes that leopard and play resumes.
     fn join(&mut self, conn: ConnId, name: &str) {
         if self.clients.len() >= MAX_CLIENTS {
-            eprintln!("[game] refused conn {conn}: both seats are taken");
+            self.log(format_args!("refused conn {conn}: both seats are taken"));
             self.out.push(Out::Close(conn));
             return;
         }
@@ -247,10 +261,15 @@ impl Game {
             name = "leopard".into();
         }
         let id = (0..MAX_CLIENTS as u8).find(|i| self.clients.iter().all(|c| c.id != *i)).unwrap();
-        eprintln!("[game] {name} joined as client {id} (conn {conn})");
         self.clients.push(Client { conn, id, name: name.clone(), seats: Vec::new(), active: 0 });
         self.cancel_vote();
         self.rebalance(Some(conn));
+        // play.ps1 waits for "joined as client" before it starts the next player.
+        let holds = match self.clients.last().unwrap().seats.as_slice() {
+            [s] => format!("steers leopard {s}"),
+            _ => "holds both leopards".to_string(),
+        };
+        self.log(format_args!("{name} joined as client {id} (conn {conn}); {holds}"));
 
         let ci = self.clients.len() - 1;
         let lname = self.sim.world.level.name.clone();
@@ -269,6 +288,7 @@ impl Game {
         self.whisper(ci, greeting);
 
         if let Some(p) = self.pause.take() {
+            self.log(format_args!("the pause ends: {name} took {}'s place", p.name));
             let back = if p.name == name { format!("{name} is back.") } else { format!("{name} takes {}'s leopard.", p.name) };
             self.resume(Some(ci));
             for other in 0..self.clients.len() {
@@ -290,13 +310,14 @@ impl Game {
     pub fn leave(&mut self, conn: ConnId) {
         let Some(ci) = self.client(conn) else { return };
         let gone = self.clients.remove(ci);
-        eprintln!("[game] {} left (client {})", gone.name, gone.id);
+        self.log(format_args!("{} left (client {}); {} still playing", gone.name, gone.id, self.clients.len()));
         for &s in &gone.seats {
             self.sim.release(s);
         }
         self.cancel_vote();
 
         if self.clients.is_empty() {
+            self.log(format_args!("nobody is left; the trail goes back to {}", self.start_level));
             self.reset_to_start();
             return;
         }
@@ -306,6 +327,7 @@ impl Game {
         }
         // The one who stayed keeps their own leopard while the world waits.
         self.sim.release_all();
+        self.log(format_args!("world paused: {} has {PAUSE_SECONDS} s to come back", gone.name));
         self.pause = Some(Pause { name: gone.name.clone(), ticks_left: PAUSE_SECONDS * TICK_HZ, choosing: false });
         self.broadcast(&self.paused_msg(PAUSE_SECONDS));
         self.say(format!("{} dropped. the trail waits a minute for them to come back.", gone.name));
@@ -316,7 +338,7 @@ impl Game {
         match (self.load)(&self.start_level).and_then(Sim::new) {
             Ok(sim) => self.sim = sim,
             Err(e) => {
-                eprintln!("[game] could not reload {}: {e}; restarting the current level", self.start_level);
+                self.log(format_args!("could not reload {}: {e}; restarting the current level", self.start_level));
                 self.sim.restart();
             }
         }
@@ -326,6 +348,8 @@ impl Game {
         self.pause = None;
         self.vote = None;
         self.round_start = self.tick;
+        self.level_began = self.tick;
+        self.restarts = 0;
     }
 
     /// One client holds both seats. With two, a client that already steers one leopard keeps
@@ -391,11 +415,21 @@ impl Game {
         }
         let (conn, id) = (self.clients[ci].conn, self.clients[ci].id);
         match (&self.vote, reset) {
-            (Some(v), true) if v.by_conn != conn => self.pass_vote(v.by),
+            (Some(v), true) if v.by_conn != conn => {
+                self.log(format_args!("{} agrees to restart", self.clients[ci].name));
+                self.pass_vote(v.by)
+            }
             (Some(_), true) => {} // already proposed
-            (Some(_), false) => self.lapse_vote(),
-            (None, true) if self.clients.len() == 1 => self.pass_vote(id),
+            (Some(_), false) => {
+                self.log(format_args!("{} withdraws or declines the restart vote", self.clients[ci].name));
+                self.lapse_vote()
+            }
+            (None, true) if self.clients.len() == 1 => {
+                self.log(format_args!("{} restarts (playing alone, no vote needed)", self.clients[ci].name));
+                self.pass_vote(id)
+            }
             (None, true) => {
+                self.log(format_args!("{} proposes a restart; {} s for the partner to agree", self.clients[ci].name, VOTE_TICKS / TICK_HZ));
                 self.vote = Some(Vote { by_conn: conn, by: id, ticks_left: VOTE_TICKS });
                 self.broadcast(&ServerMsg::Vote { by: id, ticks_left: VOTE_TICKS, state: VoteState::Open });
                 let name = self.clients[ci].name.clone();
@@ -446,6 +480,7 @@ impl Game {
         if let Some(v) = &mut self.vote {
             v.ticks_left = v.ticks_left.saturating_sub(1);
             if v.ticks_left == 0 {
+                self.log(format_args!("the restart vote lapsed unanswered"));
                 self.lapse_vote();
             }
         }
@@ -455,6 +490,15 @@ impl Game {
         if !was_won && self.sim.won() {
             self.advance_at = t + WIN_HOLD_TICKS;
             self.cancel_vote();
+            let restarts = match self.restarts {
+                0 => "no restarts".to_string(),
+                1 => "1 restart".to_string(),
+                n => format!("{n} restarts"),
+            };
+            self.log(format_args!("summit reached in {} with {restarts}", duration(t - self.level_began)));
+        }
+        if t > self.level_began && (t - self.level_began).is_multiple_of(STATUS_TICKS) {
+            self.log_status();
         }
         if self.sim.won() && !self.trail_complete && t >= self.advance_at {
             self.advance();
@@ -485,6 +529,7 @@ impl Game {
         }
         p.choosing = true;
         let name = p.name.clone();
+        self.log(format_args!("{name} did not come back; waiting for the stayer to choose both or quit"));
         self.broadcast(&ServerMsg::Round { tick: self.tick, state: RoundState::Choose, reason: Some(RoundReason::PartnerLeft), seconds: None });
         self.say(format!("{name} has not come back. take both leopards, or leave the trail?"));
     }
@@ -501,7 +546,14 @@ impl Game {
                         self.send_overlay(ci);
                     }
                 }
-                SimEvent::Restart { cause, .. } => {
+                SimEvent::Restart { cause, checkpoint } => {
+                    self.restarts += 1;
+                    let why = match cause {
+                        RestartCause::Fell => "a major failure",
+                        RestartCause::Vote => "the vote",
+                    };
+                    let to = if checkpoint { "back to the checkpoint" } else { "from the start" };
+                    self.log(format_args!("restart #{} after {why}: {to}", self.restarts));
                     self.round_start = t;
                     self.cancel_vote();
                     let reason = match cause {
@@ -521,13 +573,14 @@ impl Game {
         match next {
             Some(None) => {
                 self.trail_complete = true;
+                self.log(format_args!("the trail is complete"));
                 self.say("the trail is complete. well walked.");
                 return;
             }
             Some(Some(id)) => match (self.load)(&id).and_then(Sim::new) {
                 Ok(sim) => self.sim = sim,
                 Err(e) => {
-                    eprintln!("[game] {e}");
+                    self.log(format_args!("the next level, {id}, would not load: {e}"));
                     self.say(format!("the trail goes on to '{id}', but that level would not load."));
                     self.trail_complete = true;
                     return;
@@ -549,6 +602,8 @@ impl Game {
         self.sim.drain_events();
         self.update_push_window();
         self.round_start = self.tick;
+        self.level_began = self.tick;
+        self.restarts = 0;
         // Each level starts steering the first leopard you hold, as the mock does.
         for c in &mut self.clients {
             c.active = c.seats[0];
@@ -561,8 +616,52 @@ impl Game {
             self.send_seats(ci);
         }
         let name = self.sim.world.level.name.clone();
-        eprintln!("[game] level {}", self.level_id());
+        self.log_level();
         self.say(format!("onward: {name}."));
+    }
+
+    // ------------------------------------------------------------------ log
+
+    /// One `game` line, tagged with the level and tick so it can be lined up with the clients.
+    fn log(&self, text: std::fmt::Arguments) {
+        hlog!("game", "[{} t={}] {text}", self.level_id(), self.tick);
+    }
+
+    /// What a level is, when it begins: its name, size, rooms and mechanics.
+    fn log_level(&self) {
+        let l = &self.sim.world.level;
+        let mechanics = if l.mechanics.is_empty() { "core only".to_string() } else { l.mechanics.join(", ") };
+        self.log(format_args!(
+            "level begins: {} \"{}\" ({}x{}, {} rooms; mechanics: {mechanics})",
+            l.id, l.name, l.width, l.height, l.regions.len()
+        ));
+    }
+
+    /// The periodic `stat` line: how long this level has run, who is where, keys carried,
+    /// restarts so far.
+    fn log_status(&self) {
+        let w = &self.sim.world;
+        let who: Vec<String> = self
+            .clients
+            .iter()
+            .map(|c| {
+                let (x, y) = w.pos[c.active];
+                let room = w.level.region_at(x, y);
+                let room = if room >= 0 { w.level.regions[room as usize].name.as_str() } else { "outside any room" };
+                format!("{} on leopard {} at ({x},{y}) in {room}", c.name, c.active)
+            })
+            .collect();
+        let keys = w.entities().filter(|(_, e)| e.kind == crate::world::Kind::Key).count();
+        let keys = if keys > 0 { format!("; keys {}/{keys}", w.carried.len()) } else { String::new() };
+        hlog!(
+            "stat",
+            "[{} t={}] {} in; {}{keys}; {} restarts",
+            self.level_id(),
+            self.tick,
+            duration(self.tick - self.level_began),
+            who.join("; "),
+            self.restarts
+        );
     }
 
     // ------------------------------------------------------------------ output
@@ -594,7 +693,9 @@ impl Game {
 
     /// Server chat to everyone (sender 255, shown as "server").
     fn say(&mut self, text: impl Into<String>) {
-        self.broadcast(&ServerMsg::Chat { from: SERVER_SENDER, text: text.into() });
+        let text = text.into();
+        hlog!("say", "[{} t={}] {text}", self.level_id(), self.tick);
+        self.broadcast(&ServerMsg::Chat { from: SERVER_SENDER, text });
     }
 
     /// Server chat to one player only.
@@ -615,4 +716,10 @@ impl Game {
         let msg = ServerMsg::Overlay { tick: self.tick, hidden: p.hidden, substituted: p.substituted, phantoms: p.phantoms };
         self.send(ci, &msg);
     }
+}
+
+/// A tick count as minutes and seconds ("2m 05s"), for the log.
+fn duration(ticks: u32) -> String {
+    let s = ticks / TICK_HZ;
+    if s >= 60 { format!("{}m {:02}s", s / 60, s % 60) } else { format!("{s}s") }
 }
