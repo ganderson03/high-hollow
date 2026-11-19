@@ -13,6 +13,7 @@ namespace Crawler.UI
         Text _name, _sub;
         float _t = -1f;
 
+        /// <summary>Builds the banner: a sienna band with the room name and its subtitle, hidden.</summary>
         void Awake()
         {
             var rt = transform as RectTransform;
@@ -37,6 +38,7 @@ namespace Crawler.UI
             _sub = Label("Subtitle", font, 14, Palette.Sand, FontStyle.Italic, new Vector2(0, 0.02f), new Vector2(1, 0.45f));
         }
 
+        /// <summary>Shows a room's title, restarting the fade.</summary>
         public void Show(string name, string subtitle)
         {
             _name.text = Typeset.Spaced((name ?? "").ToUpperInvariant());
@@ -44,6 +46,7 @@ namespace Crawler.UI
             _t = 0f;
         }
 
+        /// <summary>Fades in, holds, then fades out.</summary>
         void Update()
         {
             if (_t < 0f) return;
@@ -55,6 +58,7 @@ namespace Crawler.UI
             _group.alpha = Mathf.Clamp01(a);
         }
 
+        /// <summary>A new text label inside the banner.</summary>
         Text Label(string n, Font font, int size, Color c, FontStyle style, Vector2 aMin, Vector2 aMax)
         {
             var go = new GameObject(n, typeof(RectTransform));

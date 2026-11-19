@@ -26,8 +26,10 @@ namespace Crawler.Render
         float _size;
         bool _primed;
 
+        /// <summary>The world view whose visible pieces this camera frames.</summary>
         public void SetWorld(WorldView w) => world = w;
 
+        /// <summary>Sets up an orthographic camera at the poster's three-quarter angle.</summary>
         void Awake()
         {
             _cam = GetComponent<Camera>();
@@ -41,6 +43,8 @@ namespace Crawler.Render
             _size = 12f;
         }
 
+        /// <summary>After everything has moved this frame: work out the box to frame (the current room, else every
+        /// visible piece) in camera space, and ease the camera towards it.</summary>
         void LateUpdate()
         {
             if (world == null) return;

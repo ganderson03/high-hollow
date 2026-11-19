@@ -122,6 +122,7 @@ namespace Crawler.EditorTools
             Build();
         }
 
+        /// <summary>Loads the level the scene builder is set to, from StreamingAssets.</summary>
         static LevelDef LoadLevel(out string error)
         {
             error = null;
@@ -166,7 +167,7 @@ namespace Crawler.EditorTools
                 var holder = new GameObject($"{kind}_{x}_{y}").transform;
                 holder.SetParent(root, false);
                 holder.localPosition = GridSpace.CellToWorld(x, y);
-                Looks.Build(Looks.ForKind(kind), holder, accent);
+                Looks.Build(Looks.ForKind(kind), holder, accent, x, y);
             }
         }
 
@@ -224,6 +225,7 @@ namespace Crawler.EditorTools
             return saved;
         }
 
+        /// <summary>A name made safe to use as an asset file name.</summary>
         static string Safe(string name, string fallback)
         {
             if (string.IsNullOrEmpty(name)) return fallback;

@@ -12,6 +12,7 @@ namespace Crawler.Protocol
         void OnLevel(LevelMsg msg);
         void OnRound(RoundMsg msg);
         void OnSeats(SeatsMsg msg);
+        void OnVote(VoteMsg msg);
         void OnStatus(LinkStatus status, string detail);
     }
 
@@ -31,5 +32,11 @@ namespace Crawler.Protocol
 
         /// <summary>Ask to steer another seat this client holds. The server answers with Seats.</summary>
         void SendControl(int seat);
+
+        /// <summary>Propose restarting the level, or agree to the partner's proposal (true); withdraw or decline (false).</summary>
+        void SendVote(bool reset);
+
+        /// <summary>Answer RoundState.Choose: take both leopards, or leave the trail.</summary>
+        void SendChoice(ChoicePick pick);
     }
 }

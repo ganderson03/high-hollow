@@ -5,6 +5,7 @@ using Crawler.Protocol;
 using Crawler.Render;
 using Crawler.UI;
 using UnityEngine;
+using UnityEngine.InputSystem;
 
 namespace Crawler.App
 {
@@ -50,9 +51,17 @@ namespace Crawler.App
         RegionBanner _banner;
         float _roundStart;
         bool _won;
+        bool _choosing; // the partner did not come back: B takes both leopards, Q leaves
+        bool _autostart;
 
+        /// <summary>Startup timing for the player log (play.ps1's speed checks read it).</summary>
+        void Awake() => Debug.Log($"[Boot] scene running {Time.realtimeSinceStartup:0.00}s after launch");
+
+        /// <summary>Builds the HUD, wires input and chat to the link, and shows the title card. With -autostart
+        /// (from play.ps1) it connects at once instead of waiting for Enter.</summary>
         void Start()
         {
+            ApplyCommandLine();
             Art.Style = artStyle; // read by the view layers as they build
             ProcCursor.Apply();
 
@@ -63,6 +72,7 @@ namespace Crawler.App
 
             input.TickSource = () => world.LastTick;
             input.OnSwitch = SwitchLeopard;
+            input.OnVote = () => _link?.SendVote(true);
             input.Suppressed = () => chat.IsTyping || PosterBlocking();
             chat.Blocked = PosterBlocking;
             chat.OnSubmit = text => _link?.SendChat(text);
@@ -71,10 +81,64 @@ namespace Crawler.App
             status.Set(LinkStatus.Idle, "press Enter to begin");
 
             _poster.Show(Typeset.Spaced(gameTitle), tagline, "press  ENTER  to set out", true, StartLink, instant: true);
+            if (_autostart)
+            {
+                _poster.Hide();
+                StartLink();
+            }
+            Debug.Log($"[Boot] ready {Time.realtimeSinceStartup:0.00}s after launch");
         }
 
+        /// <summary>
+        /// Overrides for a built player, so a script can start several clients against one server
+        /// without editing the scene (see play.ps1):
+        ///   -server host[:port]   play against a server instead of the mock
+        ///   -mock                 play against the built-in mock
+        ///   -name NAME            the name sent in hello
+        ///   -level ID             the level the mock starts on
+        ///   -autostart            skip the title card
+        ///   -window-x X -window-y Y   move the window (players only)
+        /// </summary>
+        void ApplyCommandLine()
+        {
+            var args = System.Environment.GetCommandLineArgs();
+            int? wx = null, wy = null;
+            for (int i = 1; i < args.Length; i++)
+            {
+                string next = i + 1 < args.Length ? args[i + 1] : null;
+                switch (args[i])
+                {
+                    case "-server" when next != null:
+                        i++;
+                        useMockFeed = false;
+                        int colon = next.LastIndexOf(':');
+                        if (colon > 0 && int.TryParse(next.Substring(colon + 1), out int p)) { host = next.Substring(0, colon); port = p; }
+                        else host = next;
+                        break;
+                    case "-mock": useMockFeed = true; break;
+                    case "-name" when next != null: playerName = next; i++; break;
+                    case "-level" when next != null: mockLevelId = next; i++; break;
+                    case "-autostart": _autostart = true; break;
+                    case "-window-x" when int.TryParse(next, out int x): wx = x; i++; break;
+                    case "-window-y" when int.TryParse(next, out int y): wy = y; i++; break;
+                }
+            }
+
+            // Two windows on one machine: the one without focus must keep pumping the link.
+            if (!useMockFeed) Application.runInBackground = true;
+
+            if (!Application.isEditor && (wx.HasValue || wy.HasValue))
+            {
+                var at = Screen.mainWindowPosition;
+                Screen.MoveMainWindowTo(Screen.mainWindowDisplayInfo, new Vector2Int(wx ?? at.x, wy ?? at.y));
+            }
+        }
+
+        /// <summary>A poster is up (or was dismissed this very frame, so the Enter that closed it is not also sent).</summary>
         bool PosterBlocking() => _poster.IsShowing || _poster.LastDismissFrame == Time.frameCount;
 
+        /// <summary>Picks the link: the built-in mock (single-player, rules run here) or a real server (rules run
+        /// there). Nothing after this line knows which one it got: both implement <see cref="IServerLink"/>.</summary>
         void StartLink()
         {
             if (_link != null) return;
@@ -101,12 +165,24 @@ namespace Crawler.App
             _link.Start(playerName);
         }
 
+        /// <summary>Once a frame: drain the link into the views, then update room titles and the choice keys.</summary>
         void Update()
         {
             _link?.Pump(this);
             TrackRegion();
+            PollChoice();
         }
 
+        /// <summary>While the server asks whether to go on alone: B takes both leopards, Q leaves the trail.</summary>
+        void PollChoice()
+        {
+            var kb = Keyboard.current;
+            if (!_choosing || _link == null || kb == null || chat.IsTyping) return;
+            if (kb.bKey.wasPressedThisFrame) { _choosing = false; _link.SendChoice(ChoicePick.Both); }
+            else if (kb.qKey.wasPressedThisFrame) { _choosing = false; _link.SendChoice(ChoicePick.Quit); }
+        }
+
+        /// <summary>Closes the link with the scene.</summary>
         void OnDestroy()
         {
             _link?.Dispose();
@@ -160,6 +236,7 @@ namespace Crawler.App
 
         // ------------------------------------------------------------------ inbound
 
+        /// <summary>Remembers this client's id, sizes the grid, and matches the input rate to the server's.</summary>
         public void OnWelcome(Welcome m)
         {
             _localClient = m.ClientId;
@@ -170,6 +247,7 @@ namespace Crawler.App
             Debug.Log($"[Link] welcome: client {m.ClientId}, {m.Width}x{m.Height}, {m.TickHz} Hz sim / {m.ReplicationHz} Hz replication");
         }
 
+        /// <summary>Loads the level file the server named and rebuilds the terrain from it.</summary>
         public void OnLevel(LevelMsg m)
         {
             var lvl = LevelStore.Load(m.Id, out var err);
@@ -187,8 +265,20 @@ namespace Crawler.App
             _roomBannerAfter = Time.time + 3.5f;
         }
 
+        /// <summary>Shows the summit card on a win; hides it when a new round starts. Pauses are explained in chat
+        /// by the server; a choice adds the keys to press.</summary>
         public void OnRound(RoundMsg m)
         {
+            // The server explains pauses and restarts in chat; the client adds only the keys to press.
+            if (m.State == RoundState.Paused) return;
+            if (m.State == RoundState.Choose)
+            {
+                _choosing = true;
+                chat.AddSystem("your partner has not come back. B: take both leopards   Q: leave the trail");
+                return;
+            }
+            _choosing = false;
+
             if (m.State == RoundState.Won)
             {
                 _won = true;
@@ -211,6 +301,7 @@ namespace Crawler.App
             }
         }
 
+        /// <summary>Which leopards are ours and which we steer; the rings and the camera follow it.</summary>
         public void OnSeats(SeatsMsg m)
         {
             _seats = m.Yours ?? new int[0];
@@ -219,10 +310,20 @@ namespace Crawler.App
             _region = -1; // re-announce the room the newly steered leopard is in
         }
 
+        /// <summary>Tells the player when the partner wants a restart.</summary>
+        public void OnVote(VoteMsg m)
+        {
+            if (m.State == VoteState.Open && m.By != _localClient)
+                chat.AddSystem("your partner wants to restart the level. press R to agree.");
+        }
+
+        /// <summary>Every snapshot replaces the whole picture; the client never simulates.</summary>
         public void OnSnapshot(Snapshot m) => world.ApplySnapshot(m);
 
+        /// <summary>What this player may see; applied when drawing, never fed back into anything.</summary>
         public void OnOverlay(Overlay m) => world.ApplyOverlay(m);
 
+        /// <summary>Adds a chat line, colored by who sent it.</summary>
         public void OnChat(ChatMsg m)
         {
             bool me = m.From == _localClient;
@@ -230,6 +331,7 @@ namespace Crawler.App
             else chat.AddLine(me ? "you" : $"p{m.From}", m.Text, me ? Palette.Ember : Palette.Sand);
         }
 
+        /// <summary>Updates the status badge; failures also go to chat and the log, once each.</summary>
         public void OnStatus(LinkStatus s, string detail)
         {
             if (s == LinkStatus.Mock) detail = $"tick {world.LastTick}";

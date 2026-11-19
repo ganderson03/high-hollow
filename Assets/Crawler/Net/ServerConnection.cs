@@ -32,12 +32,14 @@ namespace Crawler.Net
         byte _clientId;
         bool _warnedNotConnected;
 
+        /// <summary>Nothing happens until <see cref="Start"/>.</summary>
         public ServerConnection(string host, int port)
         {
             _host = host;
             _port = port;
         }
 
+        /// <summary>Starts the background thread that connects, says hello, and reads lines.</summary>
         public void Start(string playerName)
         {
             if (_reader != null) return;
@@ -46,6 +48,8 @@ namespace Crawler.Net
             _reader.Start(playerName);
         }
 
+        /// <summary>Background thread: connect (with a timeout), send hello, then queue every line received until
+        /// the server closes. Never touches Unity or the handler; the main thread does that in Pump.</summary>
         void ReadLoop(object state)
         {
             var name = (string)state;
@@ -85,6 +89,7 @@ namespace Crawler.Net
             }
         }
 
+        /// <summary>Main thread, once a frame: report status changes, then decode and dispatch every line received.</summary>
         public void Pump(IInboundHandler handler)
         {
             while (_status.TryDequeue(out var s)) handler.OnStatus(s.Item1, s.Item2);
@@ -97,12 +102,18 @@ namespace Crawler.Net
             }
         }
 
+        /// <summary>The five client-to-server messages, each one line.</summary>
         public void SendInput(InputMsg msg) => SendLine(WireCodec.EncodeInput(msg));
 
         public void SendChat(string text) => SendLine(WireCodec.EncodeChat(_clientId, text));
 
         public void SendControl(int seat) => SendLine(WireCodec.EncodeControl(seat));
 
+        public void SendVote(bool reset) => SendLine(WireCodec.EncodeVote(reset));
+
+        public void SendChoice(ChoicePick pick) => SendLine(WireCodec.EncodeChoice(pick));
+
+        /// <summary>Writes one line under the lock. Before connecting it drops silently; after a lost link it warns once.</summary>
         void SendLine(string line)
         {
             if (!_connected)
@@ -124,6 +135,7 @@ namespace Crawler.Net
             }
         }
 
+        /// <summary>Stops the reader and closes the socket.</summary>
         public void Dispose()
         {
             _running = false;
@@ -133,6 +145,7 @@ namespace Crawler.Net
             _reader = null;
         }
 
+        /// <summary>Queues a status change for the main thread to report.</summary>
         void Post(LinkStatus s, string detail) => _status.Enqueue((s, detail));
 
         /// <summary>Windows socket messages arrive with a trailing CRLF and NUL padding.</summary>
@@ -143,6 +156,7 @@ namespace Crawler.Net
             return s.Trim();
         }
 
+        /// <summary>The real error inside the AggregateException a timed-out connect wraps it in.</summary>
         static Exception Unwrap(Exception e)
         {
             while (e is AggregateException && e.InnerException != null) e = e.InnerException;
@@ -162,6 +176,7 @@ namespace Crawler.Net
             public void OnLevel(LevelMsg m) => _inner.OnLevel(m);
             public void OnRound(RoundMsg m) => _inner.OnRound(m);
             public void OnSeats(SeatsMsg m) => _inner.OnSeats(m);
+            public void OnVote(VoteMsg m) => _inner.OnVote(m);
             public void OnStatus(LinkStatus s, string d) => _inner.OnStatus(s, d);
         }
     }

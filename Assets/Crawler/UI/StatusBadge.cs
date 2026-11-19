@@ -12,6 +12,7 @@ namespace Crawler.UI
         RectTransform _paw;
         LinkStatus _status = LinkStatus.Idle;
 
+        /// <summary>Builds the badge: a dark plate, the paw glyph and a label.</summary>
         void Awake()
         {
             var font = Resources.GetBuiltinResource<Font>("LegacyRuntime.ttf");
@@ -42,6 +43,7 @@ namespace Crawler.UI
             _label.supportRichText = true;
         }
 
+        /// <summary>Shows the link's state as a colored tag (MOCK FEED, CONNECTED, NO SERVER, ...) and a detail.</summary>
         public void Set(LinkStatus s, string detail)
         {
             _status = s;
@@ -60,6 +62,7 @@ namespace Crawler.UI
             _label.text = $"<b><color=#{ColorUtility.ToHtmlStringRGB(c)}>{tag}</color></b>  {detail}";
         }
 
+        /// <summary>Spins the paw while connecting.</summary>
         void Update()
         {
             bool spinning = _status == LinkStatus.Connecting || _status == LinkStatus.Idle;

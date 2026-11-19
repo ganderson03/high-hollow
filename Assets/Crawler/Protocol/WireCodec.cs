@@ -66,7 +66,22 @@ namespace Crawler.Protocol
                         return true;
 
                     case "round":
-                        handler.OnRound(new RoundMsg { Tick = (uint)o["tick"], State = RoundFromWire((string)o["state"]) });
+                        handler.OnRound(new RoundMsg
+                        {
+                            Tick = (uint)o["tick"],
+                            State = RoundFromWire((string)o["state"]),
+                            Reason = (string)o["reason"],
+                            Seconds = o["seconds"] != null ? (int)o["seconds"] : 0,
+                        });
+                        return true;
+
+                    case "vote":
+                        handler.OnVote(new VoteMsg
+                        {
+                            By = (byte)o["by"],
+                            TicksLeft = (int)o["ticks_left"],
+                            State = VoteFromWire((string)o["state"]),
+                        });
                         return true;
 
                     default:
@@ -83,6 +98,8 @@ namespace Crawler.Protocol
             }
         }
 
+        /// <summary>Entities arrive as compact arrays <c>[x, y, kind, state, carried_by]</c>; water and hash are optional
+        /// (older servers and the mock send neither).</summary>
         static Snapshot DecodeSnapshot(JObject o)
         {
             var arr = (JArray)o["entities"];
@@ -93,9 +110,13 @@ namespace Crawler.Protocol
                 if (e.Count != 5) throw new FormatException($"entity {i} has {e.Count} fields, expected 5");
                 ents[i] = new EntityState((int)e[0], (int)e[1], (EntityKind)(byte)e[2], (byte)e[3], (sbyte)e[4]);
             }
-            return new Snapshot { Tick = (uint)o["tick"], Entities = ents };
+            var water = (JArray)o["water"] ?? new JArray();
+            var cells = new Cell[water.Count];
+            for (int i = 0; i < cells.Length; i++) cells[i] = new Cell((int)water[i][0], (int)water[i][1]);
+            return new Snapshot { Tick = (uint)o["tick"], Entities = ents, Water = cells, Hash = (string)o["hash"] };
         }
 
+        /// <summary>Any of the three lists may be missing; a missing list means nothing of that sort.</summary>
         static Overlay DecodeOverlay(JObject o)
         {
             var hidden = (JArray)o["hidden"] ?? new JArray();
@@ -117,9 +138,11 @@ namespace Crawler.Protocol
 
         // ---------------------------------------------------------------- encode (client -> server)
 
+        /// <summary>The first line a client sends.</summary>
         public static string EncodeHello(string name) =>
             Write(w => { Field(w, "t", "hello"); Field(w, "name", name); });
 
+        /// <summary>The held direction and any interact press, stamped with the last tick seen.</summary>
         public static string EncodeInput(InputMsg m) =>
             Write(w =>
             {
@@ -129,6 +152,15 @@ namespace Crawler.Protocol
                 w.WritePropertyName("interact"); w.WriteValue(m.Interact);
             });
 
+        /// <summary>Propose or agree to a restart (true), or withdraw or decline (false).</summary>
+        public static string EncodeVote(bool reset) =>
+            Write(w => { Field(w, "t", "vote"); w.WritePropertyName("reset"); w.WriteValue(reset); });
+
+        /// <summary>The answer once a dropped partner's minute is up.</summary>
+        public static string EncodeChoice(ChoicePick pick) =>
+            Write(w => { Field(w, "t", "choice"); Field(w, "pick", pick == ChoicePick.Quit ? "quit" : "both"); });
+
+        /// <summary>A chat line. The server ignores <c>from</c> and stamps the real sender.</summary>
         public static string EncodeChat(byte from, string text) =>
             Write(w =>
             {
@@ -139,6 +171,7 @@ namespace Crawler.Protocol
 
         // ---------------------------------------------------------------- encode (server -> client; used by MockFeed)
 
+        /// <summary>Server side, used by the mock so it speaks exactly what a server would.</summary>
         public static string EncodeWelcome(Welcome m) =>
             Write(w =>
             {
@@ -150,6 +183,7 @@ namespace Crawler.Protocol
                 w.WritePropertyName("replication_hz"); w.WriteValue(m.ReplicationHz);
             });
 
+        /// <summary>Server side (mock). Water and hash are left out; the mock has neither.</summary>
         public static string EncodeSnapshot(Snapshot s) =>
             Write(w =>
             {
@@ -167,6 +201,7 @@ namespace Crawler.Protocol
                 w.WriteEndArray();
             });
 
+        /// <summary>Server side (mock): one seat's perception.</summary>
         public static string EncodeOverlay(Overlay ov) =>
             Write(w =>
             {
@@ -184,17 +219,32 @@ namespace Crawler.Protocol
                 w.WriteEndArray();
             });
 
+        /// <summary>Server side (mock): which level file to load.</summary>
         public static string EncodeLevel(string id) =>
             Write(w => { Field(w, "t", "level"); Field(w, "id", id); });
 
+        /// <summary>Server side (mock): the round state, with a reason and countdown only when they apply.</summary>
         public static string EncodeRound(RoundMsg m) =>
             Write(w =>
             {
                 Field(w, "t", "round");
                 w.WritePropertyName("tick"); w.WriteValue(m.Tick);
-                Field(w, "state", m.State == RoundState.Won ? "won" : "playing");
+                Field(w, "state", RoundToWire(m.State));
+                if (m.Reason != null) Field(w, "reason", m.Reason);
+                if (m.State == RoundState.Paused) { w.WritePropertyName("seconds"); w.WriteValue(m.Seconds); }
             });
 
+        /// <summary>Server side (mock): a vote's progress.</summary>
+        public static string EncodeVoteMsg(VoteMsg m) =>
+            Write(w =>
+            {
+                Field(w, "t", "vote");
+                w.WritePropertyName("by"); w.WriteValue(m.By);
+                w.WritePropertyName("ticks_left"); w.WriteValue(m.TicksLeft);
+                Field(w, "state", m.State == VoteState.Open ? "open" : m.State == VoteState.Passed ? "passed" : "lapsed");
+            });
+
+        /// <summary>Server side (mock): which leopards this client holds.</summary>
         public static string EncodeSeats(SeatsMsg m) =>
             Write(w =>
             {
@@ -204,21 +254,50 @@ namespace Crawler.Protocol
                 w.WritePropertyName("active"); w.WriteValue(m.Active);
             });
 
+        /// <summary>Ask to steer another of this client's leopards.</summary>
         public static string EncodeControl(int seat) =>
             Write(w => { Field(w, "t", "control"); w.WritePropertyName("seat"); w.WriteValue(seat); });
 
         // ---------------------------------------------------------------- helpers
 
+        /// <summary>Wire name to round state; an unknown name is a protocol error.</summary>
         static RoundState RoundFromWire(string s)
         {
             switch (s)
             {
                 case "playing": return RoundState.Playing;
                 case "won": return RoundState.Won;
+                case "paused": return RoundState.Paused;
+                case "choose": return RoundState.Choose;
                 default: throw new FormatException("unknown round state: " + s);
             }
         }
 
+        /// <summary>Round state to wire name.</summary>
+        static string RoundToWire(RoundState s)
+        {
+            switch (s)
+            {
+                case RoundState.Won: return "won";
+                case RoundState.Paused: return "paused";
+                case RoundState.Choose: return "choose";
+                default: return "playing";
+            }
+        }
+
+        /// <summary>Wire name to vote state; an unknown name is a protocol error.</summary>
+        static VoteState VoteFromWire(string s)
+        {
+            switch (s)
+            {
+                case "open": return VoteState.Open;
+                case "passed": return VoteState.Passed;
+                case "lapsed": return VoteState.Lapsed;
+                default: throw new FormatException("unknown vote state: " + s);
+            }
+        }
+
+        /// <summary>Direction to its one-letter wire name.</summary>
         public static string MoveToWire(MoveDir m)
         {
             switch (m)
@@ -231,12 +310,14 @@ namespace Crawler.Protocol
             }
         }
 
+        /// <summary>Writes one string property.</summary>
         static void Field(JsonWriter w, string name, string value)
         {
             w.WritePropertyName(name);
             w.WriteValue(value);
         }
 
+        /// <summary>Builds one JSON object on one line: the unit of JSON Lines.</summary>
         static string Write(Action<JsonWriter> body)
         {
             var sb = new StringWriter(CultureInfo.InvariantCulture);

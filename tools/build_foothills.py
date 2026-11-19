@@ -7,6 +7,9 @@ OUT = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "Assets", "
 
 
 class Map:
+    """A level under construction: a grid of glyphs (row 0 at the top, as in the file), plus its
+    regions and links. Everything is placed by (col, row), the way the map reads."""
+
     def __init__(self, w, h, fill="T"):
         self.w, self.h = w, h
         self.g = [[fill] * w for _ in range(h)]
@@ -14,6 +17,7 @@ class Map:
         self.links = []
 
     def fill(self, c0, r0, c1, r1, ch):
+        """Sets every cell in the rectangle, corners included."""
         for r in range(r0, r1 + 1):
             for c in range(c0, c1 + 1):
                 self.g[r][c] = ch
@@ -24,17 +28,22 @@ class Map:
         self.fill(c0 + 1, r0 + 1, c1 - 1, r1 - 1, ".")
 
     def put(self, c, r, ch):
+        """Places one glyph."""
         self.g[r][c] = ch
 
     def region(self, name, subtitle, rule, c0, r0, c1, r1):
+        """Adds a named room. Rows run top-down here, but a region's rect is stored from its
+        south-west corner, as the game reads it."""
         y = self.h - 1 - r1
         self.regions.append({"name": name, "subtitle": subtitle,
                              "rect": [c0, y, c1 - c0 + 1, r1 - r0 + 1], "rule": rule})
 
     def link(self, src, dst):
+        """A lever or plate at src drives the door at dst, both (col, row)."""
         self.links.append({"from": list(src), "to": list(dst)})
 
     def write(self, lid, name, biome):
+        """Writes Assets/StreamingAssets/levels/<lid>.json and returns its path."""
         d = {"id": lid, "name": name, "biome": biome, "width": self.w, "height": self.h,
              "rows": ["".join(r) for r in self.g], "regions": self.regions}
         if self.links:
@@ -173,7 +182,7 @@ def cairn_fields():
     m.room(19, 6, 24, 15)
     m.put(19, 13, ".")                    # open mouth into the field
     m.put(20, 13, "E")
-    m.put(18, 12, "S")                    # sightstone in the field, at the nook's mouth
+    m.put(22, 14, "S")                    # sightstone inside the nook by its entrance: it reveals only its own room
     # One safe path winds from the mouth to the real key; every other cell below row 13 is a
     # hidden pit. The false key sits where walking straight down from the entrance would go,
     # so chasing it crosses three hidden pits.
@@ -185,7 +194,7 @@ def cairn_fields():
                 m.put(c, r, "h")
     m.put(*false_key, "k")                # the false key, in plain sight
     m.put(23, 7, "K")                     # the real key, deep in the nook
-    m.region("East Nook", "not all is shown  ·  Space beside the sightstone", "sight", 20, 7, 23, 14)
+    m.region("East Nook", "not all is shown  ·  stand on the sightstone, Space, and stay", "sight", 20, 7, 23, 14)
 
     # Summit gate in the field's north wall.
     m.put(12, 5, "F")

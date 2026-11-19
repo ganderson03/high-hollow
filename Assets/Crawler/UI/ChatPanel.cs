@@ -32,8 +32,10 @@ namespace Crawler.UI
 
         public bool IsTyping => _field != null && _field.isFocused;
 
+        /// <summary>Builds the panel's UI in code.</summary>
         void Awake() => Build();
 
+        /// <summary>Appends a line, dropping the oldest past the limit, and scrolls to it.</summary>
         public void AddLine(string who, string text, Color whoColor)
         {
             var hex = ColorUtility.ToHtmlStringRGB(whoColor);
@@ -44,8 +46,10 @@ namespace Crawler.UI
             _lastActivity = Time.unscaledTime;
         }
 
+        /// <summary>A line from the client itself (connection news), not from anyone in the game.</summary>
         public void AddSystem(string text) => AddLine("~", text, Palette.Ochre);
 
+        /// <summary>Fades the panel when idle, and opens the input field on Enter.</summary>
         void Update()
         {
             // Fade back when idle so the room stays readable; full strength while talking.
@@ -63,6 +67,7 @@ namespace Crawler.UI
             }
         }
 
+        /// <summary>Scrolls to the bottom after the layout has updated for a new line.</summary>
         void LateUpdate()
         {
             if (!_scrollPending) return;
@@ -71,6 +76,7 @@ namespace Crawler.UI
             _scroll.verticalNormalizedPosition = 0f;
         }
 
+        /// <summary>Sends the typed line on Enter. Losing focus by clicking away keeps the draft.</summary>
         void Submit(string text)
         {
             var kb = Keyboard.current;
@@ -83,10 +89,12 @@ namespace Crawler.UI
             if (text.Length > 0) OnSubmit?.Invoke(text);
         }
 
+        /// <summary>Stops chat text from being read as rich-text tags.</summary>
         static string Escape(string s) => s.Replace("<", "‹").Replace(">", "›");
 
         // ------------------------------------------------------------------ layout
 
+        /// <summary>Lays out the log, its scroll view and the input field.</summary>
         void Build()
         {
             var font = Resources.GetBuiltinResource<Font>("LegacyRuntime.ttf");
@@ -152,6 +160,7 @@ namespace Crawler.UI
             _field.onEndEdit.AddListener(Submit);
         }
 
+        /// <summary>A new UI rectangle anchored inside a parent.</summary>
         static RectTransform Rect(string n, Transform parent, Vector2 aMin, Vector2 aMax, Vector2 oMin, Vector2 oMax)
         {
             var go = new GameObject(n, typeof(RectTransform));
@@ -162,6 +171,7 @@ namespace Crawler.UI
             return rt;
         }
 
+        /// <summary>A new text label.</summary>
         static Text Label(string n, Transform parent, Font font, int size, Color c, TextAnchor anchor)
         {
             var rt = Rect(n, parent, Vector2.zero, Vector2.one, Vector2.zero, Vector2.zero);

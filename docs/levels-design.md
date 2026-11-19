@@ -1,6 +1,6 @@
 # Levels and mechanics: design
 
-Status: **decisions folded in; partly built**. As of v0.3.0 the client and mock have two seats with switching, minor failures with room entrances, door links, rectangular levels with an apron, trail progression, and the core module split. Major failures, the vote reset, checkpoints, disconnect handling and every non-core mechanic are not built yet. It covers the level trail, one bespoke mechanic per level, the framework they need, and every protocol change they imply, so the Rust server can be planned against the same document.
+Status: **decisions folded in; partly built**. As of v0.3.0 the client and mock have two seats with switching, minor failures with room entrances, door links, rectangular levels with an apron, trail progression, and the core module split. As of server v0.2.0 the Rust server also has major failures, the vote reset, checkpoints, disconnect handling and every non-core mechanic (see [server/README.md](../server/README.md)); the mock still has the core only, and the client still needs looks for the new pieces. It covers the level trail, one bespoke mechanic per level, the framework they need, and every protocol change they imply, so the Rust server can be planned against the same document.
 
 ## Decisions
 
