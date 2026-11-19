@@ -5,8 +5,20 @@ use std::path::PathBuf;
 use hollow::game::{Game, Out};
 use hollow::level::{Level, LevelStore, Trail};
 
+/// The client's level files, or another set named by HH_LEVELS (to try levels from another branch).
 pub fn levels_dir() -> PathBuf {
-    PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../Assets/StreamingAssets/levels")
+    match std::env::var_os("HH_LEVELS") {
+        Some(dir) => PathBuf::from(dir),
+        None => PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../Assets/StreamingAssets/levels"),
+    }
+}
+
+/// The route fixtures for those levels, or another set named by HH_ROUTES.
+pub fn routes_dir() -> PathBuf {
+    match std::env::var_os("HH_ROUTES") {
+        Some(dir) => PathBuf::from(dir),
+        None => PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("tests/routes"),
+    }
 }
 
 pub fn store() -> LevelStore {
@@ -28,7 +40,7 @@ pub fn game(start: &str) -> Game {
 
 /// A route fixture from tools/export_routes.py: [seat, action] pairs.
 pub fn route(id: &str) -> Vec<(usize, String)> {
-    let path = PathBuf::from(env!("CARGO_MANIFEST_DIR")).join(format!("tests/routes/{id}.json"));
+    let path = routes_dir().join(format!("{id}.json"));
     let text = std::fs::read_to_string(&path).unwrap_or_else(|e| panic!("{}: {e}", path.display()));
     serde_json::from_str(&text).unwrap()
 }

@@ -56,13 +56,30 @@ fn every_shipped_level_parses_and_loads() {
 
 #[test]
 fn entity_ids_follow_the_mocks_order() {
-    // Seats first, then row-scan from the top row, as Crawler.Mock.MockWorld does.
-    let sim = Sim::new(common::level("foothills-1")).unwrap();
-    let snap = sim.snapshot().0;
-    assert_eq!(snap[0], (3, 4, Kind::Player as u8, 0, -1)); // P
-    assert_eq!(snap[1], (3, 3, Kind::Player as u8, 0, -1)); // 1
-    // Row 2 (y = 6) holds the first lever at column 10.
-    assert_eq!(snap[2], (10, 6, Kind::Lever as u8, 0, -1));
+    // Seats first (P, then 1), then every entity glyph in row-scan order from the top row, as
+    // Crawler.Mock.MockWorld does. Read from the file itself, so it holds for any level set.
+    for id in ["foothills-1", "foothills-2", "foothills-3", "hollow"] {
+        let text = std::fs::read_to_string(common::levels_dir().join(format!("{id}.json"))).unwrap();
+        let json: serde_json::Value = serde_json::from_str(&text).unwrap();
+        let rows: Vec<&str> = json["rows"].as_array().unwrap().iter().map(|r| r.as_str().unwrap()).collect();
+        let h = rows.len() as i32;
+        let cells = |want: &dyn Fn(char) -> bool| -> Vec<(i32, i32)> {
+            rows.iter()
+                .enumerate()
+                .flat_map(|(r, row)| row.chars().enumerate().map(move |(x, c)| (x as i32, h - 1 - r as i32, c)))
+                .filter(|&(_, _, c)| want(c))
+                .map(|(x, y, _)| (x, y))
+                .collect()
+        };
+        let mut expected = cells(&|c| c == 'P');
+        expected.extend(cells(&|c| c == '1'));
+        expected.extend(cells(&|c| Kind::of_glyph(c).is_some()));
+
+        let snap = Sim::new(common::level(id)).unwrap().snapshot().0;
+        let got: Vec<(i32, i32)> = snap.iter().map(|e| (e.0, e.1)).collect();
+        assert_eq!(got, expected, "{id}");
+        assert_eq!((snap[0].2, snap[1].2), (Kind::Player as u8, Kind::Player as u8));
+    }
 }
 
 #[test]

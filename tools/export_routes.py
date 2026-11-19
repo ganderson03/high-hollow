@@ -14,8 +14,9 @@ sys.path.insert(0, os.path.dirname(__file__))
 import levelcheck  # noqa: E402
 
 ROOT = os.path.join(os.path.dirname(__file__), "..")
-LEVELS = os.path.join(ROOT, "Assets", "StreamingAssets", "levels")
-OUT = os.path.join(ROOT, "server", "tests", "routes")
+# HH_LEVELS / HH_ROUTES point both this and the server tests at another set of levels.
+LEVELS = os.environ.get("HH_LEVELS") or os.path.join(ROOT, "Assets", "StreamingAssets", "levels")
+OUT = os.environ.get("HH_ROUTES") or os.path.join(ROOT, "server", "tests", "routes")
 
 
 def main(ids):
