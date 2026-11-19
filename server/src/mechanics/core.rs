@@ -5,8 +5,8 @@
 //!
 //! Most state here is *derived*, not stored: whether a door is open is worked out from its
 //! levers, plates or wheels every time it is asked, so it can never fall out of step with them.
-//! Only the things a player changes directly are stored: which levers are on, and whether the
-//! sightstone has been used.
+//! Only the things a player changes directly are stored: which levers are on, and which
+//! leopards have used the sightstone.
 
 use std::collections::{BTreeMap, BTreeSet, HashMap};
 
@@ -21,7 +21,7 @@ use crate::world::{beside, Kind, Perception, SimEvent, World, SEATS};
 pub struct Core {
     /// Lever ids currently pulled on.
     levers_on: BTreeSet<usize>,
-    /// Hidden pits (`h`): real, but missing from every overlay until the sightstone is used.
+    /// Hidden pits (`h`): real, but missing from a leopard's overlay until it uses the sightstone.
     hidden_pits: Vec<usize>,
     /// Pits dressed as ledges (`-`): drawn as a ledge until the sightstone is used.
     disguised: Vec<usize>,
@@ -34,8 +34,9 @@ pub struct Core {
     linked_sources: BTreeSet<usize>,
     /// Keys in the level; the summit gate needs them all carried.
     total_keys: usize,
-    /// The sightstone has been used: hidden things show, false things fade.
-    revealed: bool,
+    /// Per seat: that leopard has used the sightstone, so hidden things show and false things
+    /// fade for it alone. Its partner still sees the lie until it uses the stone too.
+    revealed: [bool; SEATS],
     /// "The summit gate answers the keys" has been said, so it is not repeated every step.
     gate_announced: bool,
 }
@@ -208,10 +209,10 @@ impl Mechanic for Core {
                         return;
                     }
                     w.say(match e.glyph {
-                        'h' if !self.revealed => {
+                        'h' if !self.revealed[seat] => {
                             "something unseen bites. back to the room's entrance. (a sightstone might help.)"
                         }
-                        '-' if !self.revealed => "that ledge was only loose scree. back to the room's entrance.",
+                        '-' if !self.revealed[seat] => "that ledge was only loose scree. back to the room's entrance.",
                         'a' | 'b' => "a crevasse. back to the room's entrance.",
                         _ => "a fall. back to the room's entrance.",
                     });
@@ -242,14 +243,15 @@ impl Mechanic for Core {
         self.check_summit(w, seat);
     }
 
-    /// Interact pulls the first lever beside the leopard (diagonals count), or uses an unused
-    /// sightstone. Entity order decides when two are in reach, the same as the client's mock.
+    /// Interact pulls the first lever beside the leopard (diagonals count), or uses a sightstone
+    /// this leopard has not used yet. Entity order decides when two are in reach, the same as
+    /// the client's mock.
     fn on_interact(&mut self, w: &mut World, seat: usize, _tick: u32) -> bool {
         let me = w.pos[seat];
         let target = w
             .entities()
             .filter(|(_, e)| beside((e.x, e.y), me))
-            .find(|(_, e)| e.kind == Kind::Lever || (e.kind == Kind::Sightstone && !self.revealed))
+            .find(|(_, e)| e.kind == Kind::Lever || (e.kind == Kind::Sightstone && !self.revealed[seat]))
             .map(|(id, e)| (id, e.kind));
         match target {
             Some((id, Kind::Lever)) => {
@@ -262,8 +264,9 @@ impl Mechanic for Core {
                 true
             }
             Some((_, Kind::Sightstone)) => {
-                self.revealed = true;
-                w.say("the sightstone hums. hidden pits show their teeth, and any false key fades.");
+                // Only this leopard's sight changes; the partner must use the stone themself.
+                self.revealed[seat] = true;
+                w.say("the sightstone hums. hidden pits show their teeth to the one who touched it, and any false key fades.");
                 true
             }
             _ => false,
@@ -285,7 +288,8 @@ impl Mechanic for Core {
                     None => (e.x, e.y, k, 0, -1),
                 },
                 Kind::Goal => (e.x, e.y, k, on(w.won), -1),
-                Kind::Sightstone => (e.x, e.y, k, on(self.revealed), -1),
+                // Lit once either leopard has used it (the stone itself is no secret).
+                Kind::Sightstone => (e.x, e.y, k, on(self.revealed.iter().any(|&r| r)), -1),
                 Kind::Hazard => (e.x, e.y, k, on(w.filled.contains(&id)), -1),
                 Kind::Checkpoint => (e.x, e.y, k, on(w.checkpoint_lit), -1),
                 _ => continue,
@@ -293,10 +297,11 @@ impl Mechanic for Core {
         }
     }
 
-    /// Until the sightstone is used, every player sees the same lie: hidden pits are missing,
-    /// disguised pits look like ledges, and false keys appear. A filled pit is shown as it is.
-    fn perceive(&self, w: &World, _seat: usize, p: &mut Perception) {
-        if self.revealed {
+    /// Until a leopard uses the sightstone, it sees the lie: hidden pits are missing, disguised
+    /// pits look like ledges, and false keys appear. A filled pit is shown as it is. Per seat,
+    /// so using the stone reveals the truth to that leopard's player only.
+    fn perceive(&self, w: &World, seat: usize, p: &mut Perception) {
+        if self.revealed[seat] {
             return;
         }
         p.hidden.extend(self.hidden_pits.iter().filter(|id| !w.filled.contains(id)).map(|&id| id as u32));

@@ -15,7 +15,8 @@ namespace Crawler.Mock
         readonly List<Phantom> _falseKeys = new List<Phantom>();
         readonly Dictionary<int, List<int>> _doorLinks = new Dictionary<int, List<int>>(); // door id -> source ids
         int _totalKeys;
-        bool _revealed, _gateAnnounced;
+        readonly bool[] _revealed = new bool[2]; // per seat: that leopard has used the sightstone
+        bool _gateAnnounced;
 
         /// <summary>Counts keys, collects hidden pits and false keys, and resolves links to entity ids.</summary>
         public void OnLoad(MockWorld w)
@@ -49,7 +50,7 @@ namespace Crawler.Mock
         public void Reset(MockWorld w)
         {
             _leversOn.Clear();
-            _revealed = _gateAnnounced = false;
+            _revealed[0] = _revealed[1] = _gateAnnounced = false;
         }
 
         /// <summary>Only a closed door blocks.</summary>
@@ -76,7 +77,7 @@ namespace Crawler.Mock
                 switch (e.Kind)
                 {
                     case EntityKind.Hazard:
-                        w.Say(e.Glyph == 'h' && !_revealed
+                        w.Say(e.Glyph == 'h' && !_revealed[seat]
                             ? "something unseen bites. back to the room's entrance. (a sightstone might help.)"
                             : "a fall. back to the room's entrance.");
                         w.MinorFailure(seat, x, y);
@@ -132,7 +133,7 @@ namespace Crawler.Mock
             }
         }
 
-        /// <summary>Pulls the first lever beside the leopard (diagonals count), or uses an unused sightstone.</summary>
+        /// <summary>Pulls the first lever beside the leopard (diagonals count), or uses a sightstone this leopard has not used yet.</summary>
         public bool OnInteract(MockWorld w, int seat, uint tick)
         {
             var (px, py) = w.Pos[seat];
@@ -147,10 +148,10 @@ namespace Crawler.Mock
                     w.Say(on ? "*clunk*. stone grinds open nearby." : "*clunk*. a door slides shut.");
                     return true;
                 }
-                if (e.Kind == EntityKind.Sightstone && !_revealed)
+                if (e.Kind == EntityKind.Sightstone && !_revealed[seat])
                 {
-                    _revealed = true;
-                    w.Say("the sightstone hums. hidden pits show their teeth, and any false key fades.");
+                    _revealed[seat] = true;
+                    w.Say("the sightstone hums. hidden pits show their teeth to the one who touched it, and any false key fades.");
                     return true;
                 }
             }
@@ -180,17 +181,17 @@ namespace Crawler.Mock
                     case EntityKind.Goal:
                         arr[id] = new EntityState(e.X, e.Y, e.Kind, (byte)(w.Won ? 1 : 0), -1); break;
                     case EntityKind.Sightstone:
-                        arr[id] = new EntityState(e.X, e.Y, e.Kind, (byte)(_revealed ? 1 : 0), -1); break;
+                        arr[id] = new EntityState(e.X, e.Y, e.Kind, (byte)(_revealed[0] || _revealed[1] ? 1 : 0), -1); break;
                     case EntityKind.Hazard:
                         arr[id] = new EntityState(e.X, e.Y, e.Kind, 0, -1); break;
                 }
             }
         }
 
-        /// <summary>Until the sightstone is used, hidden pits are missing and false keys appear.</summary>
+        /// <summary>Until this leopard uses the sightstone, hidden pits are missing and false keys appear.</summary>
         public void Perceive(MockWorld w, int seat, OverlayBuilder overlay)
         {
-            if (_revealed) return;
+            if (_revealed[seat]) return;
             overlay.Hidden.AddRange(_hiddenPits);
             overlay.Phantoms.AddRange(_falseKeys);
         }

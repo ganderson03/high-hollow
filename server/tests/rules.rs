@@ -253,6 +253,10 @@ fn the_sightstone_reveals_hidden_pits_and_false_keys() {
     assert_eq!(sim.perception(0), Default::default());
     assert!(sim.drain_events().contains(&SimEvent::Perception));
     assert_eq!(sim.snapshot().0[2].3, 1, "sightstone used");
+    // Only the leopard that touched it sees the truth; its partner still sees the lie.
+    assert_eq!(sim.perception(1), p, "the partner's sight is unchanged");
+    interact(&mut sim, &mut t, 1);
+    assert_eq!(sim.perception(1), Default::default(), "the partner can use it too");
 }
 
 #[test]
