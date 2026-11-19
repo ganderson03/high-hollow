@@ -182,7 +182,7 @@ def cairn_fields():
     m.room(19, 6, 24, 15)
     m.put(19, 13, ".")                    # open mouth into the field
     m.put(20, 13, "E")
-    m.put(18, 12, "S")                    # sightstone in the field, at the nook's mouth
+    m.put(22, 14, "S")                    # sightstone inside the nook by its entrance: it reveals only its own room
     # One safe path winds from the mouth to the real key; every other cell below row 13 is a
     # hidden pit. The false key sits where walking straight down from the entrance would go,
     # so chasing it crosses three hidden pits.
@@ -194,7 +194,7 @@ def cairn_fields():
                 m.put(c, r, "h")
     m.put(*false_key, "k")                # the false key, in plain sight
     m.put(23, 7, "K")                     # the real key, deep in the nook
-    m.region("East Nook", "not all is shown  ·  Space beside the sightstone", "sight", 20, 7, 23, 14)
+    m.region("East Nook", "not all is shown  ·  stand on the sightstone, Space", "sight", 20, 7, 23, 14)
 
     # Summit gate in the field's north wall.
     m.put(12, 5, "F")

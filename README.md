@@ -66,7 +66,7 @@ The committed scene uses **Placeholder** art. Switch `artStyle` to **Poster** be
 | Key | Action |
 | --- | --- |
 | WASD / arrow keys | Move (the last direction pressed wins) |
-| Space | Interact with an adjacent lever or sightstone |
+| Space | Pull an adjacent lever, or use the sightstone you are standing on (it reveals its own room, to you alone) |
 | Tab | Switch to your other leopard, when you hold both |
 | Enter | Open chat, send a message |
 | R | Propose restarting the level, or agree to your partner's proposal |

@@ -128,9 +128,9 @@ fn a_disguised_pit_looks_like_a_ledge_until_the_sightstone() {
     let mut t = T::new(&["#PS-.#", "#1...#"], "");
     let pit = 3; // P, 1, S (2), - (3)
     assert_eq!(t.sim.perception(0).substituted, vec![(pit as u32, Kind::Ledge as u8)]);
+    t.go(0, Move::E); // onto the stone: it works only underfoot
     t.use_(0);
     assert!(t.sim.perception(0).substituted.is_empty());
-    t.go(0, Move::E);
     t.go(0, Move::E);
     assert_eq!(t.pos(0), (1, 1), "it is still a pit");
 }

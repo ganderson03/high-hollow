@@ -54,7 +54,7 @@ namespace Crawler.UI
                 $"{S(Palette.Umber, "■")}  summit gate: carry every key\n" +
                 $"{S(Palette.Ochre, "■")}  key: walk over it to carry it\n" +
                 $"{S(Palette.Boulder, "◉")}  pit: back to the room's entrance, your keys lost\n" +
-                $"{S(Palette.Stone, "■")}  sightstone: Space beside it to see true\n" +
+                $"{S(Palette.Stone, "■")}  sightstone: stand on it, Space: see this room true\n" +
                 $"{S(Palette.Sand, "?")}  some pits are hidden; some keys are false\n" +
                 $"{S(Palette.Cream, "◆")}  summit: both leopards, to win\n" +
                 $"\n{C(Palette.Sand, "WASD move · Space act · Tab switch leopard · Enter chat")}";

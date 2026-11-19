@@ -250,13 +250,38 @@ fn the_sightstone_reveals_hidden_pits_and_false_keys() {
     assert_eq!(p.hidden, vec![3]); // P, 1, S (2), h (3)
     assert_eq!(p.phantoms, vec![(4, 1, Kind::Key as u8)]);
     interact(&mut sim, &mut t, 0);
+    assert_eq!(sim.perception(0), p, "beside the stone is not enough");
+    assert!(walk(&mut sim, &mut t, 0, Move::E));
+    interact(&mut sim, &mut t, 0);
     assert_eq!(sim.perception(0), Default::default());
     assert!(sim.drain_events().contains(&SimEvent::Perception));
     assert_eq!(sim.snapshot().0[2].3, 1, "sightstone used");
     // Only the leopard that touched it sees the truth; its partner still sees the lie.
     assert_eq!(sim.perception(1), p, "the partner's sight is unchanged");
+    assert!(walk(&mut sim, &mut t, 0, Move::E));
+    assert!(walk(&mut sim, &mut t, 1, Move::E));
+    assert!(walk(&mut sim, &mut t, 1, Move::N));
     interact(&mut sim, &mut t, 1);
-    assert_eq!(sim.perception(1), Default::default(), "the partner can use it too");
+    assert_eq!(sim.perception(1), Default::default(), "the partner can stand on it too");
+}
+
+#[test]
+fn a_sightstone_reveals_only_its_own_room() {
+    // Two rooms side by side, each with a hidden pit; the stone is in the west room.
+    // y=1: P(1,1) S(2,1) h(3,1) | h(6,1);  y=0: 1(1,0)
+    let lvl = Level::parse(
+        r##"{"id":"t","rows":["#PSh#.h#","#1..#..#"],"regions":[
+            {"name":"west","subtitle":"","rect":[0,0,5,2],"rule":"lever"},
+            {"name":"east","subtitle":"","rect":[5,0,3,2],"rule":"lever"}]}"##,
+    )
+    .unwrap();
+    let mut sim = Sim::new(lvl).unwrap();
+    let mut t = 0;
+    assert_eq!(sim.perception(0).hidden, vec![3, 4]); // P, 1, S (2), west h (3), east h (4)
+    assert!(walk(&mut sim, &mut t, 0, Move::E));
+    interact(&mut sim, &mut t, 0);
+    assert_eq!(sim.perception(0).hidden, vec![4], "the east room keeps its secret");
+    assert_eq!(sim.perception(1).hidden, vec![3, 4], "and the partner sees neither");
 }
 
 #[test]

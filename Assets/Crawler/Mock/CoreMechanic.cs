@@ -15,7 +15,8 @@ namespace Crawler.Mock
         readonly List<Phantom> _falseKeys = new List<Phantom>();
         readonly Dictionary<int, List<int>> _doorLinks = new Dictionary<int, List<int>>(); // door id -> source ids
         int _totalKeys;
-        readonly bool[] _revealed = new bool[2]; // per seat: that leopard has used the sightstone
+        // per seat: the rooms where that leopard has used a sightstone (it sees only those true)
+        readonly HashSet<int>[] _revealed = { new HashSet<int>(), new HashSet<int>() };
         bool _gateAnnounced;
 
         /// <summary>Counts keys, collects hidden pits and false keys, and resolves links to entity ids.</summary>
@@ -50,7 +51,9 @@ namespace Crawler.Mock
         public void Reset(MockWorld w)
         {
             _leversOn.Clear();
-            _revealed[0] = _revealed[1] = _gateAnnounced = false;
+            _revealed[0].Clear();
+            _revealed[1].Clear();
+            _gateAnnounced = false;
         }
 
         /// <summary>Only a closed door blocks.</summary>
@@ -77,7 +80,7 @@ namespace Crawler.Mock
                 switch (e.Kind)
                 {
                     case EntityKind.Hazard:
-                        w.Say(e.Glyph == 'h' && !_revealed[seat]
+                        w.Say(e.Glyph == 'h' && !_revealed[seat].Contains(e.Region)
                             ? "something unseen bites. back to the room's entrance. (a sightstone might help.)"
                             : "a fall. back to the room's entrance.");
                         w.MinorFailure(seat, x, y);
@@ -133,7 +136,8 @@ namespace Crawler.Mock
             }
         }
 
-        /// <summary>Pulls the first lever beside the leopard (diagonals count), or uses a sightstone this leopard has not used yet.</summary>
+        /// <summary>Pulls the first lever beside the leopard (diagonals count), or uses the sightstone it is standing
+        /// on, if it has not already used that room's stone.</summary>
         public bool OnInteract(MockWorld w, int seat, uint tick)
         {
             var (px, py) = w.Pos[seat];
@@ -148,10 +152,11 @@ namespace Crawler.Mock
                     w.Say(on ? "*clunk*. stone grinds open nearby." : "*clunk*. a door slides shut.");
                     return true;
                 }
-                if (e.Kind == EntityKind.Sightstone && !_revealed[seat])
+                // A sightstone works only underfoot, and reveals only its own room.
+                if (e.Kind == EntityKind.Sightstone && e.X == px && e.Y == py && !_revealed[seat].Contains(e.Region))
                 {
-                    _revealed[seat] = true;
-                    w.Say("the sightstone hums. hidden pits show their teeth to the one who touched it, and any false key fades.");
+                    _revealed[seat].Add(e.Region);
+                    w.Say("the sightstone hums. this room's hidden pits show their teeth to the one standing on it, and any false key here fades.");
                     return true;
                 }
             }
@@ -181,19 +186,22 @@ namespace Crawler.Mock
                     case EntityKind.Goal:
                         arr[id] = new EntityState(e.X, e.Y, e.Kind, (byte)(w.Won ? 1 : 0), -1); break;
                     case EntityKind.Sightstone:
-                        arr[id] = new EntityState(e.X, e.Y, e.Kind, (byte)(_revealed[0] || _revealed[1] ? 1 : 0), -1); break;
+                        arr[id] = new EntityState(e.X, e.Y, e.Kind, (byte)(_revealed[0].Contains(e.Region) || _revealed[1].Contains(e.Region) ? 1 : 0), -1); break;
                     case EntityKind.Hazard:
                         arr[id] = new EntityState(e.X, e.Y, e.Kind, 0, -1); break;
                 }
             }
         }
 
-        /// <summary>Until this leopard uses the sightstone, hidden pits are missing and false keys appear.</summary>
+        /// <summary>Until this leopard uses a room's sightstone, that room's hidden pits are missing and its false
+        /// keys appear.</summary>
         public void Perceive(MockWorld w, int seat, OverlayBuilder overlay)
         {
-            if (_revealed[seat]) return;
-            overlay.Hidden.AddRange(_hiddenPits);
-            overlay.Phantoms.AddRange(_falseKeys);
+            var seen = _revealed[seat];
+            foreach (int id in _hiddenPits)
+                if (!seen.Contains(w.Ents[id].Region)) overlay.Hidden.Add(id);
+            foreach (var k in _falseKeys)
+                if (!seen.Contains(w.Level.RegionAt(k.X, k.Y))) overlay.Phantoms.Add(k);
         }
 
         // ------------------------------------------------------------------ rules
