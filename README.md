@@ -26,7 +26,16 @@ By default the client runs against the mock feed and needs no server. To play ag
 .\play.ps1
 ```
 
-Or double-click `play.cmd`. The script builds the Rust server, and also builds the Unity player when there is none or the client has changed since the last build. It then starts the server in its own window and opens two game windows side by side, one per leopard, that join on their own. Closing both game windows stops the server. The Unity editor must be closed while the script builds the player.
+Or double-click `play.cmd`. The script builds the Rust server, and also builds the Unity player when there is none or the client has changed since the last build. It then starts the server, with its log in a window of its own, and opens two game windows side by side, one per leopard, that join on their own. Closing both game windows stops the server. The Unity editor must be closed while the script builds the player.
+
+When nothing has changed, both players are in about 5 seconds:
+
+- The player is rebuilt only when the client's *contents* change. A stamp of them is kept in `Builds/HighHollow/client.stamp`, so a file Unity re-saves unchanged does not trigger a rebuild. A rebuild takes 30 to 90 seconds.
+- Level files are copied straight into the build on every run, so editing a level never needs a rebuild.
+- The second player starts as soon as the server logs the first one joining.
+- The Unity splash screen is off. It was most of the old 18-second boot.
+
+The server's log is kept in `Builds/logs/server.log`, next to `player1.log` and `player2.log`. Pass `-NoLogWindow` to skip the live log window.
 
 | Option | |
 | --- | --- |
@@ -34,6 +43,7 @@ Or double-click `play.cmd`. The script builds the Rust server, and also builds t
 | `-Level hollow` | start the trail on another level |
 | `-Build` / `-NoBuild` | force a Unity rebuild, or never build |
 | `-Port 7778` | use another port |
+| `-NoLogWindow` | keep the server log in `Builds/logs/server.log` only |
 
 Logs go to `Builds/logs/`. A built player also takes these on its command line: `-server host[:port]`, `-mock`, `-name NAME`, `-level ID` (mock only), `-autostart` (skip the title card) and `-window-x X -window-y Y`.
 

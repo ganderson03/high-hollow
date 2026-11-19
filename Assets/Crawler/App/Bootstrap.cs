@@ -54,6 +54,8 @@ namespace Crawler.App
         bool _choosing; // the partner did not come back: B takes both leopards, Q leaves
         bool _autostart;
 
+        void Awake() => Debug.Log($"[Boot] scene running {Time.realtimeSinceStartup:0.00}s after launch");
+
         void Start()
         {
             ApplyCommandLine();
@@ -81,6 +83,7 @@ namespace Crawler.App
                 _poster.Hide();
                 StartLink();
             }
+            Debug.Log($"[Boot] ready {Time.realtimeSinceStartup:0.00}s after launch");
         }
 
         /// <summary>
