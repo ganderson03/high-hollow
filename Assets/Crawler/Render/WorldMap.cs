@@ -16,6 +16,7 @@ namespace Crawler.Render
         [RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.SubsystemRegistration)]
         static void Reset() => _level = null;
 
+        /// <summary>The level now being drawn (null for the plain floor).</summary>
         public static void Set(LevelDef level) => _level = level;
 
         /// <summary>Unknown until a level is loaded, which is the case for the plain grid floor.</summary>

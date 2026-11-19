@@ -129,6 +129,9 @@ namespace Crawler.Render
         void SetCarried(bool carried) =>
             _lift = carried ? new Vector3((Id % 3 - 1) * 0.3f, 1.05f, 0f) : Vector3.zero;
 
+        /// <summary>Every frame: ease the glide towards the true cell, turn to face the way of travel, and play the
+        /// look's animation (a door sinking, a lever tilting, a leopard trotting). Cosmetic only: none of
+        /// this is ever read back into game state.</summary>
         void Update()
         {
             float dt = Time.deltaTime;
@@ -157,6 +160,7 @@ namespace Crawler.Render
             }
         }
 
+        /// <summary>Smoothstep easing: slow at both ends.</summary>
         static float Smooth(float x) => x * x * (3f - 2f * x);
     }
 }

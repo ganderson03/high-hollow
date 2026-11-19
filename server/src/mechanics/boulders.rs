@@ -17,9 +17,12 @@ use crate::protocol::{EntityWire, Move};
 use crate::sim::SLIDE_TICKS;
 use crate::world::{step, Kind, Rock, World};
 
+/// Added to a slab's `state` while a push is live, so the client can show it straining.
 pub const STRAIN: u8 = 4;
+/// Added to a rock's `state` once it has filled a pit or fallen into a chasm.
 pub const GONE: u8 = 8;
 
+/// One leopard's push on one half of a slab, live until `until`.
 #[derive(Debug, Clone)]
 struct Push {
     rock: usize,
@@ -29,12 +32,16 @@ struct Push {
     until: u32,
 }
 
+/// The boulder mechanic's own state: the live slab pushes. Rocks themselves live in the world.
 #[derive(Default, Clone)]
 pub struct Boulders {
     pushes: Vec<Push>,
 }
 
 impl Boulders {
+    /// Whether a rock may move into the cell: on the map, not solid, no leopard, no other rock,
+    /// not a pit if it is a slab, and nothing another mechanic forbids (a door, a ledge, open
+    /// water, a sluice).
     fn can_enter(w: &World, others: &Others, rock: usize, x: i32, y: i32) -> bool {
         if !w.level.in_bounds(x, y) || crate::level::Level::is_solid(w.level.at(x, y)) || w.seat_at(x, y) {
             return false;
@@ -82,6 +89,7 @@ impl Boulders {
         }
     }
 
+    /// Whether any push on this rock is live.
     fn straining(&self, rock: usize) -> bool {
         self.pushes.iter().any(|p| p.rock == rock)
     }
@@ -105,6 +113,7 @@ impl Mechanic for Boulders {
         Box::new(self.clone())
     }
 
+    /// Registers a rock for every boulder and slab, checking every slab has both halves.
     fn on_load(&mut self, w: &mut World) -> Result<(), String> {
         let mut rocks = Vec::new();
         let lvl = &w.level;
@@ -135,6 +144,7 @@ impl Mechanic for Boulders {
         Ok(())
     }
 
+    /// A leopard cannot walk into a rock; it bumps it instead (see `on_bump`).
     fn blocks(&self, w: &World, x: i32, y: i32) -> bool {
         w.rock_at(x, y).is_some()
     }
@@ -143,6 +153,9 @@ impl Mechanic for Boulders {
         false // rocks check each other in can_enter
     }
 
+    /// A leopard walked into a rock. A boulder simply moves if it can. A slab records the push and
+    /// moves only when the partner is pushing the other half the same way within the window; the
+    /// partner is then carried forward with it (a forced move the simulation runs).
     fn on_bump(&mut self, w: &mut World, others: &Others, seat: usize, dir: Move, tick: u32) {
         let target = step(w.pos[seat], dir);
         let Some(ri) = w.rock_at(target.0, target.1) else { return };
@@ -190,6 +203,7 @@ impl Mechanic for Boulders {
         }
     }
 
+    /// Expires old pushes and moves any rock sliding on ice one cell.
     fn on_tick(&mut self, w: &mut World, others: &Others, tick: u32) {
         self.pushes.retain(|p| p.until >= tick);
         for ri in 0..w.rocks.len() {

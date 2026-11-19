@@ -98,6 +98,8 @@ namespace Crawler.Protocol
             }
         }
 
+        /// <summary>Entities arrive as compact arrays <c>[x, y, kind, state, carried_by]</c>; water and hash are optional
+        /// (older servers and the mock send neither).</summary>
         static Snapshot DecodeSnapshot(JObject o)
         {
             var arr = (JArray)o["entities"];
@@ -114,6 +116,7 @@ namespace Crawler.Protocol
             return new Snapshot { Tick = (uint)o["tick"], Entities = ents, Water = cells, Hash = (string)o["hash"] };
         }
 
+        /// <summary>Any of the three lists may be missing; a missing list means nothing of that sort.</summary>
         static Overlay DecodeOverlay(JObject o)
         {
             var hidden = (JArray)o["hidden"] ?? new JArray();
@@ -135,9 +138,11 @@ namespace Crawler.Protocol
 
         // ---------------------------------------------------------------- encode (client -> server)
 
+        /// <summary>The first line a client sends.</summary>
         public static string EncodeHello(string name) =>
             Write(w => { Field(w, "t", "hello"); Field(w, "name", name); });
 
+        /// <summary>The held direction and any interact press, stamped with the last tick seen.</summary>
         public static string EncodeInput(InputMsg m) =>
             Write(w =>
             {
@@ -147,12 +152,15 @@ namespace Crawler.Protocol
                 w.WritePropertyName("interact"); w.WriteValue(m.Interact);
             });
 
+        /// <summary>Propose or agree to a restart (true), or withdraw or decline (false).</summary>
         public static string EncodeVote(bool reset) =>
             Write(w => { Field(w, "t", "vote"); w.WritePropertyName("reset"); w.WriteValue(reset); });
 
+        /// <summary>The answer once a dropped partner's minute is up.</summary>
         public static string EncodeChoice(ChoicePick pick) =>
             Write(w => { Field(w, "t", "choice"); Field(w, "pick", pick == ChoicePick.Quit ? "quit" : "both"); });
 
+        /// <summary>A chat line. The server ignores <c>from</c> and stamps the real sender.</summary>
         public static string EncodeChat(byte from, string text) =>
             Write(w =>
             {
@@ -163,6 +171,7 @@ namespace Crawler.Protocol
 
         // ---------------------------------------------------------------- encode (server -> client; used by MockFeed)
 
+        /// <summary>Server side, used by the mock so it speaks exactly what a server would.</summary>
         public static string EncodeWelcome(Welcome m) =>
             Write(w =>
             {
@@ -174,6 +183,7 @@ namespace Crawler.Protocol
                 w.WritePropertyName("replication_hz"); w.WriteValue(m.ReplicationHz);
             });
 
+        /// <summary>Server side (mock). Water and hash are left out; the mock has neither.</summary>
         public static string EncodeSnapshot(Snapshot s) =>
             Write(w =>
             {
@@ -191,6 +201,7 @@ namespace Crawler.Protocol
                 w.WriteEndArray();
             });
 
+        /// <summary>Server side (mock): one seat's perception.</summary>
         public static string EncodeOverlay(Overlay ov) =>
             Write(w =>
             {
@@ -208,9 +219,11 @@ namespace Crawler.Protocol
                 w.WriteEndArray();
             });
 
+        /// <summary>Server side (mock): which level file to load.</summary>
         public static string EncodeLevel(string id) =>
             Write(w => { Field(w, "t", "level"); Field(w, "id", id); });
 
+        /// <summary>Server side (mock): the round state, with a reason and countdown only when they apply.</summary>
         public static string EncodeRound(RoundMsg m) =>
             Write(w =>
             {
@@ -221,6 +234,7 @@ namespace Crawler.Protocol
                 if (m.State == RoundState.Paused) { w.WritePropertyName("seconds"); w.WriteValue(m.Seconds); }
             });
 
+        /// <summary>Server side (mock): a vote's progress.</summary>
         public static string EncodeVoteMsg(VoteMsg m) =>
             Write(w =>
             {
@@ -230,6 +244,7 @@ namespace Crawler.Protocol
                 Field(w, "state", m.State == VoteState.Open ? "open" : m.State == VoteState.Passed ? "passed" : "lapsed");
             });
 
+        /// <summary>Server side (mock): which leopards this client holds.</summary>
         public static string EncodeSeats(SeatsMsg m) =>
             Write(w =>
             {
@@ -239,11 +254,13 @@ namespace Crawler.Protocol
                 w.WritePropertyName("active"); w.WriteValue(m.Active);
             });
 
+        /// <summary>Ask to steer another of this client's leopards.</summary>
         public static string EncodeControl(int seat) =>
             Write(w => { Field(w, "t", "control"); w.WritePropertyName("seat"); w.WriteValue(seat); });
 
         // ---------------------------------------------------------------- helpers
 
+        /// <summary>Wire name to round state; an unknown name is a protocol error.</summary>
         static RoundState RoundFromWire(string s)
         {
             switch (s)
@@ -256,6 +273,7 @@ namespace Crawler.Protocol
             }
         }
 
+        /// <summary>Round state to wire name.</summary>
         static string RoundToWire(RoundState s)
         {
             switch (s)
@@ -267,6 +285,7 @@ namespace Crawler.Protocol
             }
         }
 
+        /// <summary>Wire name to vote state; an unknown name is a protocol error.</summary>
         static VoteState VoteFromWire(string s)
         {
             switch (s)
@@ -278,6 +297,7 @@ namespace Crawler.Protocol
             }
         }
 
+        /// <summary>Direction to its one-letter wire name.</summary>
         public static string MoveToWire(MoveDir m)
         {
             switch (m)
@@ -290,12 +310,14 @@ namespace Crawler.Protocol
             }
         }
 
+        /// <summary>Writes one string property.</summary>
         static void Field(JsonWriter w, string name, string value)
         {
             w.WritePropertyName(name);
             w.WriteValue(value);
         }
 
+        /// <summary>Builds one JSON object on one line: the unit of JSON Lines.</summary>
         static string Write(Action<JsonWriter> body)
         {
             var sb = new StringWriter(CultureInfo.InvariantCulture);

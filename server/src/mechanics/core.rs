@@ -2,6 +2,11 @@
 //! chasms, the sightstone with its hidden pits, false keys and disguised ledges, the
 //! checkpoint's look, and the goal. A port of `Crawler.Mock.CoreMechanic`, extended with
 //! the design doc's major failures and the sources other biomes add (rocks on plates, wheels).
+//!
+//! Most state here is *derived*, not stored: whether a door is open is worked out from its
+//! levers, plates or wheels every time it is asked, so it can never fall out of step with them.
+//! Only the things a player changes directly are stored: which levers are on, and whether the
+//! sightstone has been used.
 
 use std::collections::{BTreeMap, BTreeSet, HashMap};
 
@@ -9,21 +14,38 @@ use crate::mechanic::Mechanic;
 use crate::protocol::EntityWire;
 use crate::world::{beside, Kind, Perception, SimEvent, World, SEATS};
 
+/// The core rules' own state. Cloned whole for a save, like every mechanic.
+/// (`BTree` collections rather than hash maps: their order is fixed, so iterating them is
+/// deterministic.)
 #[derive(Default, Clone)]
 pub struct Core {
+    /// Lever ids currently pulled on.
     levers_on: BTreeSet<usize>,
+    /// Hidden pits (`h`): real, but missing from every overlay until the sightstone is used.
     hidden_pits: Vec<usize>,
+    /// Pits dressed as ledges (`-`): drawn as a ledge until the sightstone is used.
     disguised: Vec<usize>,
+    /// False keys (`k`): drawn as keys until the sightstone is used; not entities at all.
     false_keys: Vec<(i32, i32, u8)>,
     /// Door id -> the lever, plate or wheel ids that drive it.
     door_links: BTreeMap<usize, Vec<usize>>,
+    /// Every lever, plate or wheel that drives a linked door, so it does not also open its
+    /// region's other doors.
     linked_sources: BTreeSet<usize>,
+    /// Keys in the level; the summit gate needs them all carried.
     total_keys: usize,
+    /// The sightstone has been used: hidden things show, false things fade.
     revealed: bool,
+    /// "The summit gate answers the keys" has been said, so it is not repeated every step.
     gate_announced: bool,
 }
 
 impl Core {
+    /// Whether a door is open right now. Three rules, in order:
+    /// 1. the summit gate `F` opens when every key is carried, and its links too if it has any;
+    /// 2. a door with links opens while any of its sources is active;
+    /// 3. otherwise its region's rule decides: in a "plate" region any plate there opens it,
+    ///    elsewhere any lever there does.
     fn door_open(&self, w: &World, id: usize) -> bool {
         let door = &w.ents[id];
         let linked = self.door_links.get(&id);
@@ -51,6 +73,8 @@ impl Core {
         })
     }
 
+    /// Whether a door's source is on: a lever that has been pulled, a plate with a leopard or a
+    /// rock standing on it, or a wheel that water is reaching.
     fn source_active(&self, w: &World, id: usize) -> bool {
         let e = &w.ents[id];
         match e.kind {
@@ -69,6 +93,7 @@ impl Core {
         }
         let goals: Vec<_> = w.entities().filter(|(_, e)| e.kind == Kind::Goal).map(|(_, e)| *e).collect();
         for g in goals {
+            // Either leopard may be the one on the marker; the other is "the partner".
             for s in 0..SEATS {
                 if w.pos[s] != (g.x, g.y) {
                     continue;
@@ -80,6 +105,7 @@ impl Core {
                     (other.0 - g.x).abs() <= 2 && (other.1 - g.y).abs() <= 2
                 };
                 if !near {
+                    // Only say it to the leopard that just arrived, not every step its partner takes.
                     if s == seat {
                         w.say("the summit, but alone. your partner needs to be here too.");
                     }
@@ -94,6 +120,7 @@ impl Core {
     }
 }
 
+/// Small numbers as words, for the chat lines ("the summit gate answers the two keys").
 fn number(n: usize) -> String {
     match n {
         2 => "two".into(),
@@ -112,6 +139,9 @@ impl Mechanic for Core {
         Box::new(self.clone())
     }
 
+    /// Sorts the level's pieces into what the core tracks, and resolves every link from the
+    /// map coordinates in the file to entity ids. A link to something that is not a door, or
+    /// from something that is not a lever, plate or wheel, is a broken level and is refused.
     fn on_load(&mut self, w: &mut World) -> Result<(), String> {
         let mut by_cell = HashMap::new();
         for (id, e) in w.entities() {
@@ -149,6 +179,7 @@ impl Mechanic for Core {
         Ok(())
     }
 
+    /// The core blocks only one thing: a closed door.
     fn blocks(&self, w: &World, x: i32, y: i32) -> bool {
         w.ents_at(x, y).any(|(id, e)| e.kind == Kind::Door && !self.door_open(w, id))
     }
@@ -162,13 +193,16 @@ impl Mechanic for Core {
         })
     }
 
+    /// A leopard stepped into a cell: it may fall, pick up a key, or reach the summit.
     fn on_enter(&mut self, w: &mut World, seat: usize, _tick: u32) {
         let (x, y) = w.pos[seat];
         let here: Vec<usize> = w.ents_at(x, y).map(|(id, _)| id).collect();
         for id in here {
             let e = w.ents[id];
             match e.kind {
+                // A pit a boulder has filled is just floor now.
                 Kind::Hazard if !w.filled.contains(&id) => {
+                    // A chasm costs the level. The core only asks; the simulation restarts it.
                     if e.glyph == 'X' {
                         w.major_failure("into the chasm.");
                         return;
@@ -181,12 +215,15 @@ impl Mechanic for Core {
                         'a' | 'b' => "a crevasse. back to the room's entrance.",
                         _ => "a fall. back to the room's entrance.",
                     });
+                    // Every other hazard is minor: this leopard alone goes back and drops its keys.
                     w.minor_failure(seat, x, y);
+                    // Keys went back, so the gate is shut again; announce it again when it reopens.
                     if w.carried.len() < self.total_keys {
                         self.gate_announced = false;
                     }
                     return;
                 }
+                // A key nobody is carrying: this leopard picks it up just by stepping on it.
                 Kind::Key if !w.carried.contains_key(&id) => {
                     w.carried.insert(id, seat);
                     w.say(format!("key {} of {}.", w.carried.len(), self.total_keys));
@@ -205,6 +242,8 @@ impl Mechanic for Core {
         self.check_summit(w, seat);
     }
 
+    /// Interact pulls the first lever beside the leopard (diagonals count), or uses an unused
+    /// sightstone. Entity order decides when two are in reach, the same as the client's mock.
     fn on_interact(&mut self, w: &mut World, seat: usize, _tick: u32) -> bool {
         let me = w.pos[seat];
         let target = w
@@ -214,6 +253,7 @@ impl Mechanic for Core {
             .map(|(id, e)| (id, e.kind));
         match target {
             Some((id, Kind::Lever)) => {
+                // A lever toggles: insert succeeds if it was off; otherwise it was on, so remove it.
                 let on = self.levers_on.insert(id);
                 if !on {
                     self.levers_on.remove(&id);
@@ -230,6 +270,8 @@ impl Mechanic for Core {
         }
     }
 
+    /// Each core piece's state for the snapshot. A carried key is drawn at its carrier's cell,
+    /// with `carried_by` set to that seat. Pieces belonging to other mechanics are left alone.
     fn write(&self, w: &World, out: &mut [EntityWire]) {
         for (id, e) in w.entities() {
             let k = e.kind as u8;
@@ -251,6 +293,8 @@ impl Mechanic for Core {
         }
     }
 
+    /// Until the sightstone is used, every player sees the same lie: hidden pits are missing,
+    /// disguised pits look like ledges, and false keys appear. A filled pit is shown as it is.
     fn perceive(&self, w: &World, _seat: usize, p: &mut Perception) {
         if self.revealed {
             return;

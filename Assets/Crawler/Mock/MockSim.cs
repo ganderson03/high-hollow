@@ -26,9 +26,11 @@ namespace Crawler.Mock
 
         public int Active => _active;
         public bool Won => World.Won;
+        /// <summary>Where a leopard stands (for the editor tools and tests).</summary>
         public (int x, int y) SeatPos(int seat) => World.Pos[seat];
         public int KeysCarried => World.Carried.Count;
 
+        /// <summary>Builds the world for a level, with the core rules switched on.</summary>
         public MockSim(LevelDef level)
         {
             World = new MockWorld(level, Out);
@@ -56,12 +58,15 @@ namespace Crawler.Mock
 
         // ------------------------------------------------------------------ input
 
+        /// <summary>The held direction replaces the last; an interact press is kept until the next step uses it.</summary>
         public void SetInput(MoveDir move, bool interact)
         {
             _move = move;
             _interact |= interact; // consumed on the next simulated step
         }
 
+        /// <summary>Switches the leopard being steered, and resends seats and perception (perception follows the
+        /// leopard you steer).</summary>
         public void SetActive(int seat, uint tick)
         {
             if (seat < 0 || seat >= MockWorld.Seats || seat == _active) return;
@@ -71,6 +76,7 @@ namespace Crawler.Mock
             Out.Enqueue(WireCodec.EncodeOverlay(Perception(tick))); // perception follows the active seat
         }
 
+        /// <summary>The mock's one player always holds both leopards.</summary>
         public SeatsMsg Seats() => new SeatsMsg { Yours = new[] { 0, 1 }, Active = _active };
 
         // ------------------------------------------------------------------ simulation
@@ -90,6 +96,7 @@ namespace Crawler.Mock
             if (_move != MoveDir.None && tick >= _nextStep[_active]) TryMove(_active, tick);
         }
 
+        /// <summary>One step, if the cell is walkable; then every mechanic reacts to the new cell.</summary>
         void TryMove(int seat, uint tick)
         {
             var (x, y) = World.Pos[seat];
@@ -110,6 +117,7 @@ namespace Crawler.Mock
             }
         }
 
+        /// <summary>The leopards' positions, then each mechanic writes its pieces' states.</summary>
         public Snapshot Snapshot(uint tick)
         {
             var arr = new EntityState[World.Ents.Count];

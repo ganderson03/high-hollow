@@ -43,6 +43,7 @@ namespace Crawler.Mock
             _sim = new MockSim(first);
         }
 
+        /// <summary>Starts the clock and sends what a server sends on joining.</summary>
         public void Start(string playerName)
         {
             _started = true;
@@ -51,6 +52,7 @@ namespace Crawler.Mock
             Begin(0, first: true);
         }
 
+        /// <summary>Welcome, level, a fresh round and a greeting: the start of every level.</summary>
         void Begin(uint tick, bool first)
         {
             var lvl = _sim.World.Level;
@@ -66,6 +68,9 @@ namespace Crawler.Mock
                 : $"onward: {lvl.Name}.");
         }
 
+        /// <summary>Main thread, once a frame: simulate up to the clock (at most four snapshots' worth, so a hitch
+        /// does not stall the frame), then dispatch everything produced through the same codec a real
+        /// connection uses.</summary>
         public void Pump(IInboundHandler handler)
         {
             if (!_started) return;
@@ -89,6 +94,7 @@ namespace Crawler.Mock
             }
         }
 
+        /// <summary>Runs the sim to this tick; after a win, holds the summit card, then moves on.</summary>
         void Simulate(uint tick)
         {
             bool wasWon = _sim.Won;
@@ -122,8 +128,10 @@ namespace Crawler.Mock
             Begin(tick, first: false);
         }
 
+        /// <summary>Inputs go straight to the sim; there is no network in between.</summary>
         public void SendInput(InputMsg msg) => _sim.SetInput(msg.Move, msg.Interact);
 
+        /// <summary>Chat is echoed back, as a server would relay it.</summary>
         public void SendChat(string text) => _lines.Enqueue(WireCodec.EncodeChat(LocalClientId, text));
 
         /// <summary>The mock's one client holds both seats, so a restart proposal passes at once.</summary>
@@ -140,19 +148,23 @@ namespace Crawler.Mock
         /// <summary>The mock has no partner to lose, so it never asks for a choice.</summary>
         public void SendChoice(ChoicePick pick) { }
 
+        /// <summary>Switch which leopard the one local player steers.</summary>
         public void SendControl(int seat)
         {
             _sim.SetActive(seat, (uint)(_clock.ElapsedMilliseconds * TickHz / 1000));
             Drain();
         }
 
+        /// <summary>Stops the clock.</summary>
         public void Dispose() => _clock.Stop();
 
+        /// <summary>Moves the sim's queued lines into this feed's outbox.</summary>
         void Drain()
         {
             while (_sim.Out.Count > 0) _lines.Enqueue(_sim.Out.Dequeue());
         }
 
+        /// <summary>Server chat from the mock.</summary>
         void Say(string text) => _lines.Enqueue(WireCodec.EncodeChat(MockSim.ServerSender, text));
     }
 }

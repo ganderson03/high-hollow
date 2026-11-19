@@ -6,6 +6,8 @@ use std::path::{Path, PathBuf};
 
 use serde::Deserialize;
 
+/// A named room in the level: its title card, and the rule its doors follow ("lever",
+/// "plate", ...).
 #[derive(Debug, Clone)]
 pub struct Region {
     pub name: String,
@@ -19,18 +21,21 @@ pub struct Region {
 }
 
 impl Region {
+    /// Whether the cell is inside this room.
     pub fn contains(&self, x: i32, y: i32) -> bool {
         x >= self.x && y >= self.y && x < self.x + self.w && y < self.y + self.h
     }
 }
 
 /// A lever or plate driving a door, in world cells (x from the west, y from the south).
+/// A lever, plate or wheel that drives one door. Converted to world cells on load.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct Link {
     pub from: (i32, i32),
     pub to: (i32, i32),
 }
 
+/// A level as read from its JSON file. Immutable once loaded.
 #[derive(Debug, Clone)]
 pub struct Level {
     pub id: String,
@@ -47,6 +52,7 @@ pub struct Level {
     pub ice_under: Vec<(i32, i32)>,
 }
 
+/// The file as written; `Level::parse` checks it and turns it into a `Level`.
 #[derive(Deserialize)]
 struct RawLevel {
     id: Option<String>,
@@ -66,6 +72,7 @@ struct RawLevel {
     ice: Vec<Vec<i32>>,
 }
 
+/// A region as written in the file; `rect` is `[x, y, w, h]`.
 #[derive(Deserialize)]
 struct RawRegion {
     #[serde(default)]
@@ -77,6 +84,7 @@ struct RawRegion {
     rect: Vec<i32>,
 }
 
+/// A link as written in the file: `[column, row]` pairs as they read in `rows`.
 #[derive(Deserialize)]
 struct RawLink {
     from: Vec<i32>,
@@ -90,6 +98,9 @@ pub fn valid_id(id: &str) -> bool {
 }
 
 impl Level {
+    /// Reads and validates a level file. Rows are listed north to south in the file, so row 0
+    /// becomes the top of the map (y = height - 1). Any inconsistency (a ragged row, a link off
+    /// the map, a bad id) is an error rather than a guess.
     pub fn parse(json: &str) -> Result<Level, String> {
         let raw: RawLevel = serde_json::from_str(json).map_err(|e| format!("bad level json: {e}"))?;
         let rows = raw.rows;
@@ -170,6 +181,7 @@ impl Level {
         self.at(x, y) == '~' || self.ice_under.contains(&(x, y))
     }
 
+    /// Whether the cell is on the map.
     pub fn in_bounds(&self, x: i32, y: i32) -> bool {
         x >= 0 && y >= 0 && x < self.width && y < self.height
     }
@@ -179,6 +191,7 @@ impl Level {
         if self.in_bounds(x, y) { self.tiles[y as usize][x as usize] } else { '#' }
     }
 
+    /// Walls and trees block everything; every other glyph stands on floor.
     pub fn is_solid(c: char) -> bool {
         c == '#' || c == 'T'
     }
@@ -188,6 +201,7 @@ impl Level {
         self.regions.iter().position(|r| r.contains(x, y)).map_or(-1, |i| i as i32)
     }
 
+    /// The door rule of a region ("" for no region).
     pub fn rule_of(&self, region: i32) -> &str {
         if region >= 0 { self.regions.get(region as usize).map_or("", |r| r.rule.as_str()) } else { "" }
     }
@@ -210,11 +224,13 @@ impl Level {
         (0..self.height).rev().flat_map(move |y| (0..self.width).map(move |x| (x, y, self.at(x, y))))
     }
 
+    /// The first cell holding a glyph, in row-scan order.
     pub fn find(&self, glyph: char) -> Option<(i32, i32)> {
         self.scan().find(|&(_, _, c)| c == glyph).map(|(x, y, _)| (x, y))
     }
 }
 
+/// One biome of the trail: its levels in order.
 #[derive(Debug, Clone, Deserialize)]
 pub struct Biome {
     pub id: String,
@@ -224,12 +240,14 @@ pub struct Biome {
     pub levels: Vec<String>,
 }
 
+/// The order of play, from `levels/trail.json`.
 #[derive(Debug, Clone, Deserialize)]
 pub struct Trail {
     pub biomes: Vec<Biome>,
 }
 
 impl Trail {
+    /// Reads `trail.json`.
     pub fn parse(json: &str) -> Result<Trail, String> {
         serde_json::from_str(json).map_err(|e| format!("bad trail json: {e}"))
     }
@@ -248,20 +266,25 @@ impl Trail {
 }
 
 /// Loads levels and the trail from a directory (the client's StreamingAssets/levels).
+/// Loads levels and the trail from a directory (the client's StreamingAssets/levels).
 #[derive(Debug, Clone)]
 pub struct LevelStore {
     dir: PathBuf,
 }
 
 impl LevelStore {
+    /// A store reading from this directory.
     pub fn new(dir: impl Into<PathBuf>) -> Self {
         LevelStore { dir: dir.into() }
     }
 
+    /// The directory it reads from (for the log).
     pub fn dir(&self) -> &Path {
         &self.dir
     }
 
+    /// Loads `<dir>/<id>.json`. The id is checked before it is used as a file name (a client
+    /// could send any string), and the file must say the same id inside.
     pub fn load(&self, id: &str) -> Result<Level, String> {
         if !valid_id(id) {
             return Err(format!("level id '{id}' is not [a-z0-9_-]{{1,32}}"));
@@ -275,6 +298,7 @@ impl LevelStore {
         Ok(level)
     }
 
+    /// Loads `<dir>/trail.json`.
     pub fn trail(&self) -> Result<Trail, String> {
         let path = self.dir.join("trail.json");
         let text = fs::read_to_string(&path).map_err(|e| format!("{}: {e}", path.display()))?;

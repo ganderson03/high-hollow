@@ -20,8 +20,10 @@ use crate::mechanic::{Mechanic, Others};
 use crate::protocol::{EntityWire, Move};
 use crate::world::{beside, step, Kind, World, SEATS};
 
+/// Direction indices 0 to 3, the same numbering as a sluice's `state` on the wire.
 const DIRS: [Move; 4] = [Move::N, Move::E, Move::S, Move::W];
 
+/// A sluice gate: where it is, the side water comes in by, and the side it lets water out.
 #[derive(Debug, Clone)]
 struct Sluice {
     at: (i32, i32),
@@ -32,6 +34,8 @@ struct Sluice {
 /// Wet cells, turning wheels, and the direction index each wet cell was reached by.
 type Flow = (BTreeSet<(i32, i32)>, BTreeSet<usize>, BTreeMap<(i32, i32), usize>);
 
+/// The creek's layout (sources, sluices, wheels) and whether the swing warning has been given.
+/// The flowing cells themselves are recomputed into the world every tick.
 #[derive(Default, Clone)]
 pub struct Water {
     sources: Vec<(i32, i32)>,
@@ -40,11 +44,13 @@ pub struct Water {
     warned: bool,
 }
 
+/// Glyphs water can be in: channel, sluice, wheel and source.
 fn conducts(c: char) -> bool {
     matches!(c, 'w' | 'V' | 'M' | 'W')
 }
 
 impl Water {
+    /// The sluice in this cell, if any.
     fn sluice_at(&self, cell: (i32, i32)) -> Option<&Sluice> {
         self.sluices.values().find(|s| s.at == cell)
     }
@@ -95,6 +101,7 @@ impl Water {
             .collect()
     }
 
+    /// Runs the flow and stores the result in the world, where the other rules can see it.
     fn recompute(&self, w: &mut World) {
         let (wet, turning, _) = self.flow(w, false);
         w.water = wet;
@@ -111,6 +118,8 @@ impl Mechanic for Water {
         Box::new(self.clone())
     }
 
+    /// Finds the sources, sluices and wheels, works out each sluice's inlet by flowing water with
+    /// every sluice open, opens each sluice on its first useful exit, and computes the first flow.
     fn on_load(&mut self, w: &mut World) -> Result<(), String> {
         for (x, y, c) in w.level.scan() {
             if c == 'W' {
@@ -146,6 +155,7 @@ impl Mechanic for Water {
         Ok(())
     }
 
+    /// Leopards cannot walk into the machinery or into flowing water (a dry bed is fine).
     fn blocks(&self, w: &World, x: i32, y: i32) -> bool {
         matches!(w.level.at(x, y), 'W' | 'V' | 'M') || w.water.contains(&(x, y))
     }
@@ -155,6 +165,7 @@ impl Mechanic for Water {
         matches!(w.level.at(x, y), 'W' | 'V' | 'M')
     }
 
+    /// Interact beside a sluice swings it to its next exit. The first swing comes with a warning.
     fn on_interact(&mut self, w: &mut World, seat: usize, _tick: u32) -> bool {
         let me = w.pos[seat];
         let Some((&id, s)) = self.sluices.iter().find(|(_, s)| beside(s.at, me)) else { return false };
@@ -174,6 +185,7 @@ impl Mechanic for Water {
         true
     }
 
+    /// Recomputes the flow from scratch, then sweeps away any leopard the water has reached.
     fn on_tick(&mut self, w: &mut World, _others: &Others, _tick: u32) {
         self.recompute(w);
         for s in 0..SEATS {

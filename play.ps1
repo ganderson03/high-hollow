@@ -42,8 +42,10 @@ $logDir = Join-Path $root "Builds\logs"
 $serverLog = Join-Path $logDir "server.log"
 New-Item -ItemType Directory -Force $logDir | Out-Null
 
+# One progress line, with the time since the script started (so slow steps show).
 function Step($text) { Write-Host ("==> {0}  ({1:N1}s)" -f $text, $clock.Elapsed.TotalSeconds) -ForegroundColor Cyan }
 
+# The Unity editor matching ProjectSettings\ProjectVersion.txt, from the Hub's install folder.
 function Find-Unity {
     if ($Unity) { return $Unity }
     $line = Get-Content (Join-Path $root "ProjectSettings\ProjectVersion.txt") | Where-Object { $_ -like "m_EditorVersion:*" }
@@ -68,6 +70,7 @@ function Get-ClientStamp {
     [BitConverter]::ToString($sha.ComputeHash([Text.Encoding]::UTF8.GetBytes(($lines -join "`n")))).Replace("-", "")
 }
 
+# Builds the Windows player headlessly (the editor must be closed), then records the stamp.
 function Build-Player {
     if ((Test-Path (Join-Path $root "Temp\UnityLockfile")) -and (Get-Process -Name "Unity" -ErrorAction SilentlyContinue)) {
         throw "The Unity editor has this project open, and a project can only be open once. Close the editor, or build from File > Build Profiles to Builds\HighHollow\HighHollow.exe and run with -NoBuild."

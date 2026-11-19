@@ -20,8 +20,10 @@
 
 use crate::protocol::EntityWire;
 
+/// Identifies the format (and its version) at the start of every encoding.
 pub const MAGIC: &[u8; 4] = b"HHC1";
 
+/// The canonical bytes for one snapshot, laid out as in the table above.
 pub fn encode(tick: u32, entities: &[EntityWire], water: &[(i32, i32)]) -> Vec<u8> {
     let mut b = Vec::with_capacity(16 + entities.len() * 11 + water.len() * 8);
     b.extend_from_slice(MAGIC);
@@ -42,10 +44,12 @@ pub fn encode(tick: u32, entities: &[EntityWire], water: &[(i32, i32)]) -> Vec<u
     b
 }
 
+/// XXH3-64 of the canonical bytes.
 pub fn hash(tick: u32, entities: &[EntityWire], water: &[(i32, i32)]) -> u64 {
     xxhash_rust::xxh3::xxh3_64(&encode(tick, entities, water))
 }
 
+/// The hash as sent in a snapshot: 16 lowercase hex digits.
 pub fn hash_hex(tick: u32, entities: &[EntityWire], water: &[(i32, i32)]) -> String {
     format!("{:016x}", hash(tick, entities, water))
 }

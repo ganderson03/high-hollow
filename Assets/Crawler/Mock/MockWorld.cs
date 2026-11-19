@@ -33,6 +33,8 @@ namespace Crawler.Mock
         public bool Won;
         public int FirstEntity => Seats; // entity ids 0 and 1 are the seats
 
+        /// <summary>Creates the seats, then one entity per piece glyph in row-scan order. Entity ids come from this
+        /// order, and the Rust server numbers them the same way.</summary>
         public MockWorld(LevelDef level, Queue<string> output)
         {
             Level = level;
@@ -67,9 +69,11 @@ namespace Crawler.Mock
             }
         }
 
+        /// <summary>Appends an entity; its id is its index.</summary>
         void Add(EntityKind kind, char glyph, int x, int y) =>
             Ents.Add(new MockEnt { Kind = kind, Glyph = glyph, X = x, Y = y, Region = Level.RegionAt(x, y) });
 
+        /// <summary>The first cell with this glyph, in row-scan order.</summary>
         public bool Find(char glyph, out int fx, out int fy)
         {
             for (int y = Level.Height - 1; y >= 0; y--)
@@ -90,6 +94,7 @@ namespace Crawler.Mock
             return true;
         }
 
+        /// <summary>Whether either leopard stands in the cell.</summary>
         public bool SeatAt(int x, int y)
         {
             for (int s = 0; s < Seats; s++)
@@ -97,9 +102,11 @@ namespace Crawler.Mock
             return false;
         }
 
+        /// <summary>A region's door rule, or "" outside any region.</summary>
         public string RuleOf(int region) =>
             region >= 0 && region < Level.Regions.Count ? Level.Regions[region].Rule : "";
 
+        /// <summary>Server chat to the player.</summary>
         public void Say(string text) => Out.Enqueue(WireCodec.EncodeChat(MockSim.ServerSender, text));
 
         /// <summary>
@@ -119,6 +126,7 @@ namespace Crawler.Mock
             else if (dropped > 1) Say($"all {dropped} keys slip loose and land back where they lay.");
         }
 
+        /// <summary>Whether the partner stands in the cell.</summary>
         bool OtherSeatAt(int seat, int x, int y)
         {
             int other = 1 - seat;
@@ -133,6 +141,7 @@ namespace Crawler.Mock
         public readonly List<Substitution> Substituted = new List<Substitution>();
         public readonly List<Phantom> Phantoms = new List<Phantom>();
 
+        /// <summary>The collected perception as an overlay message.</summary>
         public Overlay Build(uint tick) => new Overlay
         {
             Tick = tick,

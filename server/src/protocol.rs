@@ -17,6 +17,7 @@ pub const MAX_CHAT: usize = 200;
 /// Longest player name kept, in characters.
 pub const MAX_NAME: usize = 24;
 
+/// A direction held on the keyboard (`n`, `s`, `e`, `w` or `none` on the wire).
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "lowercase")]
 pub enum Move {
@@ -28,6 +29,7 @@ pub enum Move {
 }
 
 impl Move {
+    /// The step this direction takes: north is +y, east is +x.
     pub fn delta(self) -> (i32, i32) {
         match self {
             Move::N => (0, 1),
@@ -40,6 +42,7 @@ impl Move {
 }
 
 /// Client to server.
+/// Every message a client may send, decoded from its `t` field.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 #[serde(tag = "t", rename_all = "snake_case")]
 pub enum ClientMsg {
@@ -74,6 +77,7 @@ pub enum ClientMsg {
     },
 }
 
+/// The stayer's answer once a dropped partner's minute is up.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "lowercase")]
 pub enum Pick {
@@ -81,6 +85,7 @@ pub enum Pick {
     Quit,
 }
 
+/// The state of the round, decided by the server; the client only shows it.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "lowercase")]
 pub enum RoundState {
@@ -93,6 +98,7 @@ pub enum RoundState {
 }
 
 /// Why a round started that was not a fresh level: a major failure or an agreed vote.
+/// Why a round started that was not a fresh level.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
 pub enum RoundReason {
@@ -101,6 +107,7 @@ pub enum RoundReason {
     PartnerLeft,
 }
 
+/// Where a restart proposal stands.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "lowercase")]
 pub enum VoteState {
@@ -113,6 +120,7 @@ pub enum VoteState {
 pub type EntityWire = (i32, i32, u8, u8, i8);
 
 /// Server to client.
+/// Every message the server sends. Field order matches the client's encoder.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 #[serde(tag = "t", rename_all = "snake_case")]
 pub enum ServerMsg {
@@ -168,6 +176,7 @@ pub enum ServerMsg {
 }
 
 impl ServerMsg {
+    /// A plain `round` message, with no reason or countdown.
     pub fn round(tick: u32, state: RoundState) -> ServerMsg {
         ServerMsg::Round { tick, state, reason: None, seconds: None }
     }
@@ -180,6 +189,7 @@ impl ServerMsg {
 }
 
 impl ClientMsg {
+    /// One line from a client, or why it is not a valid message.
     pub fn decode(line: &str) -> Result<ClientMsg, String> {
         serde_json::from_str(line).map_err(|e| e.to_string())
     }

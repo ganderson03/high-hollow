@@ -26,6 +26,7 @@ namespace Crawler.UI
         /// <summary>Frame the card was dismissed on, so the same key press doesn't also act in-game.</summary>
         public int LastDismissFrame { get; private set; } = -1;
 
+        /// <summary>Builds the poster card (painted art, badge, title, subtitle, prompt), hidden.</summary>
         void Awake()
         {
             var rt = transform as RectTransform;
@@ -83,12 +84,15 @@ namespace Crawler.UI
             if (instant) _group.alpha = 1f;
         }
 
+        /// <summary>Fades the poster out and lets clicks through again.</summary>
         public void Hide()
         {
             _target = 0f;
             _group.blocksRaycasts = false;
         }
 
+        /// <summary>Fades towards the target, pulses the prompt, and dismisses on Enter, Space or a click once fully
+        /// shown (so the key that opened it cannot also close it).</summary>
         void Update()
         {
             _group.alpha = Mathf.MoveTowards(_group.alpha, _target, FadeRate * Time.unscaledDeltaTime);
@@ -114,11 +118,13 @@ namespace Crawler.UI
             cb?.Invoke();
         }
 
+        /// <summary>Frees the generated poster texture.</summary>
         void OnDestroy()
         {
             if (_tex != null) Destroy(_tex);
         }
 
+        /// <summary>A new text label on the poster.</summary>
         Text Label(string n, Font font, int size, Color color, FontStyle style, Vector2 anchor, Vector2 box)
         {
             var go = new GameObject(n, typeof(RectTransform));

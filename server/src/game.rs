@@ -24,8 +24,11 @@ use crate::protocol::{
 use crate::sim::{Sim, PUSH_WINDOW, SOLO_PUSH_WINDOW};
 use crate::world::{RestartCause, SimEvent, SEATS};
 
+/// Simulation ticks per second. Every timing in the rules is a number of these.
 pub const TICK_HZ: u32 = 60;
+/// Snapshots sent per second. The client draws smoothly between them, so 20 is plenty.
 pub const REPLICATION_HZ: u32 = 20;
+/// A snapshot goes out every third tick.
 pub const TICKS_PER_SNAPSHOT: u32 = TICK_HZ / REPLICATION_HZ;
 /// Six seconds on the summit card before the next level.
 pub const WIN_HOLD_TICKS: u32 = 360;
@@ -33,10 +36,15 @@ pub const WIN_HOLD_TICKS: u32 = 360;
 pub const PAUSE_SECONDS: u32 = 60;
 /// How long a restart proposal waits for the partner (10 s).
 pub const VOTE_TICKS: u32 = 600;
+/// Two leopards, so at most two players; a third connection is refused.
 pub const MAX_CLIENTS: usize = 2;
 
+/// A connection's id, given by the network layer. Not the same as a player's `client_id`
+/// (0 or 1), which is what the protocol shows.
 pub type ConnId = u64;
 
+/// What the game wants the network layer to do. The game never touches a socket; it leaves
+/// these in its outbox and `net.rs` carries them out.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum Out {
     Send(ConnId, String),
@@ -44,50 +52,72 @@ pub enum Out {
     Close(ConnId),
 }
 
+/// A player who has said hello.
 #[derive(Debug, Clone)]
 struct Client {
     conn: ConnId,
+    /// 0 or 1: the id the protocol shows (in `welcome`, and as the sender of chat).
     id: u8,
     name: String,
+    /// The leopards this player controls: both when alone, one each with a partner.
     seats: Vec<usize>,
+    /// The leopard this player is steering right now; inputs move it.
     active: usize,
 }
 
+/// The world is frozen because a partner dropped.
 #[derive(Debug, Clone)]
 struct Pause {
     /// Who dropped.
     name: String,
     /// Loop ticks left before the choice; counted even though the world is frozen.
     ticks_left: u32,
+    /// The minute is up and the stayer has been asked to pick `both` or `quit`.
     choosing: bool,
 }
 
+/// An open proposal to restart the level.
 #[derive(Debug, Clone)]
 struct Vote {
+    /// Who proposed it (their agreeing again does nothing).
     by_conn: ConnId,
     by: u8,
+    /// Counts down every tick; at zero the proposal lapses.
     ticks_left: u32,
 }
 
+/// Loads a level by id. Passed in, so the game itself never reads files.
 pub type Loader = Box<dyn Fn(&str) -> Result<Level, String> + Send>;
 
+/// The whole session. See the module documentation.
 pub struct Game {
     load: Loader,
+    /// The order of levels; `None` replays one level forever.
     trail: Option<Trail>,
+    /// Where the trail starts, and where it goes back to when everyone leaves.
     start_level: String,
+    /// The level being played.
     sim: Sim,
+    /// The simulation clock (see `tick()`).
     tick: u32,
+    /// The players who have said hello, in the order they joined.
     clients: Vec<Client>,
+    /// After a win, the tick at which the next level loads (the summit card stays up till then).
     advance_at: u32,
+    /// The last level has been won; nothing more to load.
     trail_complete: bool,
+    /// Set while waiting for a dropped partner.
     pause: Option<Pause>,
+    /// Set while a restart proposal is open.
     vote: Option<Vote>,
     /// Inputs stamped before this tick were sent for an earlier round and are dropped.
     round_start: u32,
+    /// What to send or close; emptied by `take_out`.
     out: Vec<Out>,
 }
 
 impl Game {
+    /// A session waiting at the start of the trail, with nobody connected yet.
     pub fn new(start_level: &str, trail: Option<Trail>, load: Loader) -> Result<Game, String> {
         let sim = Sim::new(load(start_level)?)?;
         Ok(Game {
@@ -106,26 +136,34 @@ impl Game {
         })
     }
 
+    /// The current simulation tick. It stops advancing while nobody is connected or the world
+    /// is paused.
     pub fn tick(&self) -> u32 {
         self.tick
     }
 
+    /// The id of the level being played, as in its file name.
     pub fn level_id(&self) -> &str {
         &self.sim.world.level.id
     }
 
+    /// The simulation, read-only (for the tests).
     pub fn sim(&self) -> &Sim {
         &self.sim
     }
 
+    /// How many players have said hello.
     pub fn player_count(&self) -> usize {
         self.clients.len()
     }
 
+    /// True while waiting for a dropped partner, or for the stayer's choice.
     pub fn paused(&self) -> bool {
         self.pause.is_some()
     }
 
+    /// Everything the game wants sent or closed since the last call. The network layer calls
+    /// this after every tick and every message.
     pub fn take_out(&mut self) -> Vec<Out> {
         std::mem::take(&mut self.out)
     }
@@ -190,10 +228,14 @@ impl Game {
         }
     }
 
+    /// The index in `clients` of the player on this connection, if they have said hello.
     fn client(&self, conn: ConnId) -> Option<usize> {
         self.clients.iter().position(|c| c.conn == conn)
     }
 
+    /// A `hello` from a new connection: refuse a third player, otherwise seat them and send
+    /// everything a client needs to draw the level. If the world was paused for a dropped
+    /// partner, the newcomer takes that leopard and play resumes.
     fn join(&mut self, conn: ConnId, name: &str) {
         if self.clients.len() >= MAX_CLIENTS {
             eprintln!("[game] refused conn {conn}: both seats are taken");
@@ -243,6 +285,8 @@ impl Game {
         }
     }
 
+    /// A connection closed. Nobody left: back to the start of the trail. A partner left: the
+    /// world pauses for a minute to give them time to come back.
     pub fn leave(&mut self, conn: ConnId) {
         let Some(ci) = self.client(conn) else { return };
         let gone = self.clients.remove(ci);
@@ -332,12 +376,15 @@ impl Game {
         }
     }
 
+    /// The `round` message that says the world is paused, and for how much longer.
     fn paused_msg(&self, seconds: u32) -> ServerMsg {
         ServerMsg::Round { tick: self.tick, state: RoundState::Paused, reason: Some(RoundReason::PartnerLeft), seconds: Some(seconds) }
     }
 
     // ------------------------------------------------------------------ vote
 
+    /// A `vote` from a player. `reset: true` proposes, or agrees to the partner's proposal;
+    /// `false` withdraws or declines. Nobody can vote while paused or after a win.
     fn vote(&mut self, ci: usize, reset: bool) {
         if self.pause.is_some() || self.sim.won() {
             return;
@@ -358,6 +405,8 @@ impl Game {
         }
     }
 
+    /// Both agreed (or one player holds both seats): restart through the same path a major
+    /// failure uses, so the checkpoint is honoured the same way.
     fn pass_vote(&mut self, by: u8) {
         self.vote = None;
         self.broadcast(&ServerMsg::Vote { by, ticks_left: 0, state: VoteState::Passed });
@@ -368,12 +417,14 @@ impl Game {
         self.flush_events(t);
     }
 
+    /// Ends an open proposal without a restart, and tells everyone.
     fn lapse_vote(&mut self) {
         if let Some(v) = self.vote.take() {
             self.broadcast(&ServerMsg::Vote { by: v.by, ticks_left: 0, state: VoteState::Lapsed });
         }
     }
 
+    /// A proposal does not survive a change in who is playing, a restart or a win.
     fn cancel_vote(&mut self) {
         self.lapse_vote();
     }
@@ -416,6 +467,8 @@ impl Game {
         self.tick += 1;
     }
 
+    /// One loop tick of the pause: count down, tell the stayer once a second, and at zero ask
+    /// them to choose. The world itself does not move.
     fn count_pause(&mut self) {
         let p = self.pause.as_mut().unwrap();
         if p.choosing {
@@ -436,6 +489,8 @@ impl Game {
         self.say(format!("{name} has not come back. take both leopards, or leave the trail?"));
     }
 
+    /// Turns what the simulation reported into messages: chat lines to everyone, the win, new
+    /// overlays when perception changed, and the restart notice with its reason.
     fn flush_events(&mut self, t: u32) {
         for ev in self.sim.drain_events() {
             match ev {
@@ -483,6 +538,8 @@ impl Game {
         self.begin_level();
     }
 
+    /// Starts the newly loaded level for everyone: the same messages a client gets on joining,
+    /// in the order the client expects them (it rebuilds the terrain on `level`).
     fn begin_level(&mut self) {
         for ci in 0..self.clients.len() {
             self.send(ci, &self.welcome(ci));
@@ -510,6 +567,7 @@ impl Game {
 
     // ------------------------------------------------------------------ output
 
+    /// The first message a client gets: its id, the level's size and the clock rates.
     fn welcome(&self, ci: usize) -> ServerMsg {
         let level = &self.sim.world.level;
         ServerMsg::Welcome {
@@ -521,10 +579,12 @@ impl Game {
         }
     }
 
+    /// To one player.
     fn send(&mut self, ci: usize, msg: &ServerMsg) {
         self.out.push(Out::Send(self.clients[ci].conn, msg.encode()));
     }
 
+    /// To every player. Encoded once, however many players there are.
     fn broadcast(&mut self, msg: &ServerMsg) {
         let line = msg.encode();
         for c in &self.clients {
@@ -532,14 +592,17 @@ impl Game {
         }
     }
 
+    /// Server chat to everyone (sender 255, shown as "server").
     fn say(&mut self, text: impl Into<String>) {
         self.broadcast(&ServerMsg::Chat { from: SERVER_SENDER, text: text.into() });
     }
 
+    /// Server chat to one player only.
     fn whisper(&mut self, ci: usize, text: String) {
         self.send(ci, &ServerMsg::Chat { from: SERVER_SENDER, text });
     }
 
+    /// Tells a player which leopards are theirs and which one they are steering.
     fn send_seats(&mut self, ci: usize) {
         let c = &self.clients[ci];
         let msg = ServerMsg::Seats { yours: c.seats.iter().map(|&s| s as u8).collect(), active: c.active as u8 };

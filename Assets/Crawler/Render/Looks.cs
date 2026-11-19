@@ -19,8 +19,11 @@ namespace Crawler.Render
     {
         public const int Unknown = -1;
 
+        /// <summary>A piece's normal look is its kind; the overlay can substitute another.</summary>
         public static int ForKind(EntityKind k) => (int)k;
 
+        /// <summary>How a look moves: doors sink, levers tilt, plates press, leopards trot. Kinds without art yet
+        /// (8 and up) do not move.</summary>
         public static LookAnim AnimFor(int look)
         {
             switch ((EntityKind)look)
@@ -374,6 +377,7 @@ namespace Crawler.Render
             Block(tail, cream, new Vector3(0, 0.09f, -0.31f), new Vector3(0.055f, 0.055f, 0.07f));
         }
 
+        /// <summary>One colored box: the unit the placeholder leopard is built from.</summary>
         static void Block(Transform parent, Color c, Vector3 pos, Vector3 scale)
         {
             var go = new GameObject("Block");
@@ -398,6 +402,7 @@ namespace Crawler.Render
             }
         }
 
+        /// <summary>One mesh placed under a parent.</summary>
         static GameObject Piece(Transform parent, Mesh mesh, Material mat, Vector3 pos, Quaternion rot)
         {
             var go = new GameObject(mesh.name);
@@ -409,9 +414,11 @@ namespace Crawler.Render
             return go;
         }
 
+        /// <summary>A flat cut-out shape extruded to a thickness: the poster style's basic piece.</summary>
         static GameObject Flat(Transform parent, string key, Vector2[] outline, float thickness, Material mat, Vector3 pos, Quaternion rot) =>
             Piece(parent, MeshGen.Extrude(key, outline, thickness), mat, pos, rot);
 
+        /// <summary>A readable name for the scene hierarchy.</summary>
         static string LookName(int look) =>
             look >= 0 && look <= 7 ? ((EntityKind)look).ToString() : "Unknown" + look;
     }

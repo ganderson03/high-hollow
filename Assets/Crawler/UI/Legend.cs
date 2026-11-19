@@ -7,14 +7,16 @@ namespace Crawler.UI
     /// <summary>
     /// Top-right key: what each piece is and what it does, plus the controls. Static text.
     ///
-    /// The rules described here are the demo rules, which today live only in MockFeed. If
-    /// the server's rules change, this text has to change with them. Swatch colors follow
+    /// The rules described here are the core rules, which live in the client's mock (Crawler.Mock)
+    /// and the Rust server (server/src/mechanics/core.rs). If they change, this text has to change
+    /// with them. Swatch colors follow
     /// the dominant color of each look and hold for both art styles.
     /// </summary>
     public sealed class Legend : MonoBehaviour
     {
         const float Width = 300f;
 
+        /// <summary>Builds the key's text and swatches.</summary>
         void Awake()
         {
             var font = Resources.GetBuiltinResource<Font>("LegacyRuntime.ttf");
@@ -58,6 +60,7 @@ namespace Crawler.UI
                 $"\n{C(Palette.Sand, "WASD move · Space act · Tab switch leopard · Enter chat")}";
         }
 
+        /// <summary>Wraps text in a rich-text color tag.</summary>
         static string C(Color c, string s) => $"<color=#{ColorUtility.ToHtmlStringRGB(c)}>{s}</color>";
 
         /// <summary>A swatch: the glyph set larger than body text so the color actually reads.</summary>

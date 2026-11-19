@@ -10,8 +10,11 @@ use std::collections::{BTreeMap, BTreeSet};
 use crate::level::Level;
 use crate::protocol::{EntityWire, Move};
 
+/// Two leopards, so two seats. Seat N is entity id N.
 pub const SEATS: usize = 2;
 
+/// What an entity is. The number is the `kind` on the wire, shared with the client's
+/// `EntityKind`, so the two must stay in step.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 #[repr(u8)]
 pub enum Kind {
@@ -54,6 +57,8 @@ impl Kind {
 }
 
 /// A level entity: what it is and where it started.
+/// A level entity: what it is and where it started. Fixed for the life of the level;
+/// what changes (a door opening, a key being carried) lives in the mechanics.
 #[derive(Debug, Clone, Copy)]
 pub struct Ent {
     pub kind: Kind,
@@ -63,6 +68,7 @@ pub struct Ent {
     pub region: i32,
 }
 
+/// Why the level went back to its start (or the checkpoint).
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum RestartCause {
     /// A major failure.
@@ -71,6 +77,7 @@ pub enum RestartCause {
     Vote,
 }
 
+/// Something the simulation wants said or sent. The session decides who receives it.
 /// Something the simulation wants said or sent. The session decides who receives it.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum SimEvent {
@@ -86,6 +93,8 @@ pub enum SimEvent {
 
 /// A boulder or slab. Shape 0 is a boulder; 1 a slab along x (x and x+1); 2 a slab along y
 /// (y and y+1). A rock that filled a pit or fell into a chasm is `gone` and occupies nothing.
+/// A boulder or slab, tracked here rather than in the boulder mechanic because other rules
+/// need to see it: a rock holds down a plate (core) and dams a channel (water).
 #[derive(Debug, Clone)]
 pub struct Rock {
     pub id: usize,
@@ -98,6 +107,7 @@ pub struct Rock {
 }
 
 impl Rock {
+    /// The cells this rock covers: one for a boulder, two for a slab.
     pub fn cells(&self) -> Vec<(i32, i32)> {
         match self.shape {
             1 => vec![(self.x, self.y), (self.x + 1, self.y)],
@@ -106,11 +116,14 @@ impl Rock {
         }
     }
 
+    /// Whether this rock occupies the cell (a rock that is gone occupies nothing).
     pub fn covers(&self, x: i32, y: i32) -> bool {
         !self.gone && self.cells().contains(&(x, y))
     }
 }
 
+/// The level's state that the rules share. The simulation owns it; each mechanic gets it
+/// while its hook runs, reads what it needs and changes what it is responsible for.
 #[derive(Clone)]
 pub struct World {
     pub level: Level,
@@ -146,6 +159,8 @@ impl World {
     /// Entity ids 0 and 1 are the seats.
     pub const FIRST_ENTITY: usize = SEATS;
 
+    /// Builds the world for a freshly loaded level: both leopards at their spawns and one entity
+    /// for every piece glyph, numbered exactly as the client's mock numbers them.
     pub fn new(level: Level) -> World {
         // P is seat 0, 1 is seat 1. A level missing '1' puts the second leopard beside the first.
         let p = level.find('P').unwrap_or((1, 1));
@@ -191,6 +206,7 @@ impl World {
         }
     }
 
+    /// Every entity except the two leopards, with its id.
     pub fn entities(&self) -> impl Iterator<Item = (usize, &Ent)> {
         self.ents.iter().enumerate().skip(Self::FIRST_ENTITY)
     }
@@ -200,6 +216,7 @@ impl World {
         self.entities().filter(move |(_, e)| e.x == x && e.y == y)
     }
 
+    /// Whether either leopard stands in the cell.
     pub fn seat_at(&self, x: i32, y: i32) -> bool {
         self.pos.contains(&(x, y))
     }
@@ -209,6 +226,7 @@ impl World {
         self.rocks.iter().position(|r| r.covers(x, y))
     }
 
+    /// Queues a line of server chat for both players.
     pub fn say(&mut self, text: impl Into<String>) {
         self.events.push(SimEvent::Say(text.into()));
     }
@@ -259,6 +277,8 @@ impl World {
 }
 
 /// One seat's perception, collected before it is sent as an overlay.
+/// One seat's perception, collected before it is sent as an overlay. Never fed back into
+/// the rules: what a leopard sees can be wrong, what happens to it is always the truth.
 #[derive(Debug, Clone, Default, PartialEq, Eq)]
 pub struct Perception {
     pub hidden: Vec<u32>,

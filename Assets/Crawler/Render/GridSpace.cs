@@ -9,6 +9,7 @@ namespace Crawler.Render
         public static int Width = 32;
         public static int Height = 32;
 
+        /// <summary>The world position of a cell's centre.</summary>
         public static Vector3 CellToWorld(int x, int y) => new Vector3(x + 0.5f, 0f, y + 0.5f);
     }
 }

@@ -71,14 +71,17 @@ pub struct Others<'a> {
 }
 
 impl Others<'_> {
+    /// Every other mechanic, in order.
     fn all(&self) -> impl Iterator<Item = &Box<dyn Mechanic>> {
         self.before.iter().chain(self.after)
     }
 
+    /// Whether any other mechanic blocks a leopard here.
     pub fn blocks(&self, w: &World, x: i32, y: i32) -> bool {
         self.all().any(|m| m.blocks(w, x, y))
     }
 
+    /// Whether any other mechanic stops a rock going here.
     pub fn blocks_rock(&self, w: &World, x: i32, y: i32) -> bool {
         self.all().any(|m| m.blocks_rock(w, x, y))
     }

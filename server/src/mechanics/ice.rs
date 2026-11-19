@@ -8,6 +8,7 @@
 use crate::mechanic::Mechanic;
 use crate::world::World;
 
+/// Ice has no state of its own: the slide lives in the world, and the cells in the level.
 #[derive(Clone, Copy)]
 pub struct Ice;
 
@@ -20,10 +21,13 @@ impl Mechanic for Ice {
         Box::new(*self)
     }
 
+    /// A rock cannot be pushed into open water.
     fn blocks_rock(&self, w: &World, x: i32, y: i32) -> bool {
         w.level.at(x, y) == '%'
     }
 
+    /// Decides what the cell does to a leopard arriving in it: open water is a major failure,
+    /// ice starts or continues a slide the way the leopard was moving, anything else ends it.
     fn on_enter(&mut self, w: &mut World, seat: usize, _tick: u32) {
         let (x, y) = w.pos[seat];
         if w.level.at(x, y) == '%' {

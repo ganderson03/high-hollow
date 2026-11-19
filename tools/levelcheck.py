@@ -14,6 +14,8 @@ DIRS = [(1, 0), (-1, 0), (0, 1), (0, -1)]
 
 
 def load(path):
+    """Reads a level file into a dict of cells, its regions and its links (as world cells),
+    collecting any shape errors instead of failing on the first."""
     d = json.load(open(path, encoding="utf-8"))
     rows = d["rows"]
     h = d.get("height", d.get("grid", len(rows)))
@@ -41,16 +43,21 @@ def load(path):
 
 
 def region_at(regions, x, y):
+    """Index of the first region containing the cell, or -1 (same rule as the game)."""
     for i, (_, _, rx, ry, rw, rh) in enumerate(regions):
         if rx <= x < rx + rw and ry <= y < ry + rh:
             return i
     return -1
 
 
+# The search gives up after this many distinct states. Reaching it means "no win found yet",
+# not "unsolvable" (High Hollow needs about 5M).
 MAX_STATES = 10_000_000  # High Hollow needs about 5M
 
 
 def analyse(path, max_states=MAX_STATES):
+    """Checks a level and solves it. Returns the file, its size, any errors, and the shortest
+    two-leopard win as (actions, control switches, [(seat, action), ...]) or None."""
     d, w, h, tiles, regions, links, errs = load(path)
     at = lambda x, y: tiles.get((x, y), "#")
 
@@ -66,6 +73,8 @@ def analyse(path, max_states=MAX_STATES):
     if find("2"):
         errs.append("glyph '2' found: the game is two-player now")
 
+    # Entities in the game's id order (row-scan from the top), so links and regions resolve
+    # exactly as the game resolves them.
     ents = []  # (kind, glyph, x, y, region)
     for y in range(h - 1, -1, -1):
         for x in range(w):
@@ -77,9 +86,12 @@ def analyse(path, max_states=MAX_STATES):
     by_cell = {(e[2], e[3]): i for i, e in enumerate(ents)}
     levers = [i for i, e in enumerate(ents) if e[0] == "lever"]
     keys = [i for i, e in enumerate(ents) if e[0] == "key"]
+    # A search state stores levers as one integer (bit per lever) and keys as a tuple (carrier
+    # seat per key, -1 if lying where it started), so states are small and hashable.
     lever_bit = {i: b for b, i in enumerate(levers)}
     key_idx = {i: b for b, i in enumerate(keys)}
 
+    # door entity -> the levers and plates linked to it
     door_links = {}
     for (fc, tc) in links:
         if tc not in by_cell or ents[by_cell[tc]][0] != "door":
@@ -102,6 +114,7 @@ def analyse(path, max_states=MAX_STATES):
                 if not any(at(x, y) == "E" for x in range(rx, rx + rw) for y in range(ry, ry + rh)):
                     errs.append(f"region '{regions[reg][0]}' has a pit but no E entrance")
 
+    # region -> its E cell, where a leopard that falls in that room comes back
     entrance = {}
     for i, (_, _, rx, ry, rw, rh) in enumerate(regions):
         for y in range(ry, ry + rh):
@@ -109,13 +122,16 @@ def analyse(path, max_states=MAX_STATES):
                 if at(x, y) == "E":
                     entrance[i] = (x, y)
 
+    # The rules below mirror Crawler.Mock.CoreMechanic (and so the Rust server's core.rs).
     def source_active(src, pos, lv):
+        # a lever that is on, or a plate with a leopard on it
         e = ents[src]
         if e[0] == "lever":
             return bool(lv >> lever_bit[src] & 1)
         return (e[2], e[3]) in pos
 
     def door_open(di, pos, lv, carried):
+        # summit gate: every key carried; linked door: any source; else the region's rule
         e = ents[di]
         if e[1] == "F":
             return len(keys) > 0 and all(c >= 0 for c in carried)
@@ -132,6 +148,7 @@ def analyse(path, max_states=MAX_STATES):
         return False
 
     def walkable(x, y, pos, other, lv, carried):
+        # on the map, not solid, not the partner's cell, not a closed door
         if not (0 <= x < w and 0 <= y < h) or at(x, y) in SOLID:
             return False
         if (x, y) == other:
@@ -157,6 +174,9 @@ def analyse(path, max_states=MAX_STATES):
         return False
 
     def solve(seats):
+        # Breadth-first search over (leopard 0's cell, leopard 1's cell, levers, keys). Breadth
+        # first means the first win found is a shortest one. Each state remembers the state and
+        # action it came from, so the route can be read back from the win.
         start = (p0, p1, 0, tuple([-1] * len(keys)))
         prev = {start: None}
         q = deque([start])
@@ -182,6 +202,8 @@ def analyse(path, max_states=MAX_STATES):
                     npos = [pa, pb]
                     npos[s] = (nx, ny)
                     nc = list(carried)
+                    # what the new cell does: a pit sends this leopard to its room's entrance and
+                    # drops its keys; a key nobody carries is picked up
                     i = by_cell.get((nx, ny))
                     if i is not None:
                         k = ents[i][0]
@@ -193,6 +215,7 @@ def analyse(path, max_states=MAX_STATES):
                     nst = (npos[0], npos[1], lv, tuple(nc))
                     step = {(1, 0): "e", (-1, 0): "w", (0, 1): "n", (0, -1): "s"}[(dx, dy)]
                     if won(npos):
+                        # walk back through prev to recover the route, then count hand-offs
                         actions = [(s, step)]
                         cur = st
                         while prev[cur] is not None:

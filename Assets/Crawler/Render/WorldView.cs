@@ -45,12 +45,14 @@ namespace Crawler.Render
         public IReadOnlyList<EntityView> Views => _views;
         public IReadOnlyList<EntityView> PhantomViews => _phantoms;
 
+        /// <summary>Makes the roots the views hang under, if the scene did not provide them.</summary>
         void Awake()
         {
             if (entityRoot == null) entityRoot = MakeChild("Entities");
             if (phantomRoot == null) phantomRoot = MakeChild("Phantoms");
         }
 
+        /// <summary>A new snapshot replaces the whole picture. The client never predicts or simulates.</summary>
         public void ApplySnapshot(Snapshot s)
         {
             _entities = s.Entities; // wholesale replace; the decoded array is ours and never mutated
@@ -59,6 +61,8 @@ namespace Crawler.Render
             Rebuild();
         }
 
+        /// <summary>A new perception layer: what this player cannot see, sees as something else, or sees that is
+        /// not there.</summary>
         public void ApplyOverlay(Overlay ov)
         {
             _overlay = ov ?? Overlay.Empty;
@@ -69,6 +73,8 @@ namespace Crawler.Render
             Rebuild();
         }
 
+        /// <summary>Binds every view to its entity (one view per entity id), then applies the overlay on top, then
+        /// places the phantoms. Also marks the leopards this player holds and finds the steered one's cell.</summary>
         void Rebuild()
         {
             // Authoritative layer: one view per entity id.
@@ -113,8 +119,11 @@ namespace Crawler.Render
         /// <summary>Seat 0 wears sienna, seat 1 pine.</summary>
         static readonly Color[] Scarves = { Palette.Sienna, Palette.Pine };
 
+        /// <summary>The scarf color for a leopard.</summary>
         static Color ScarfFor(int playerOrdinal) => Scarves[playerOrdinal % Scarves.Length];
 
+        /// <summary>Adds views until there are enough. Views are kept and reused, never destroyed, so a new level
+        /// binds old views to new entities (see EntityView.SetLook for what that means for doors).</summary>
         static void Grow(List<EntityView> list, int n, Transform parent)
         {
             while (list.Count < n)
@@ -126,6 +135,7 @@ namespace Crawler.Render
             }
         }
 
+        /// <summary>A new empty child.</summary>
         Transform MakeChild(string n)
         {
             var t = new GameObject(n).transform;

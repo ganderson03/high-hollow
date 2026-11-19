@@ -24,6 +24,7 @@ namespace Crawler.Render
 
         int _w = 32, _h = 32;
 
+        /// <summary>A plain square floor, used before any level is known.</summary>
         public void Build(int size)
         {
             _w = _h = grid = size;
@@ -32,6 +33,8 @@ namespace Crawler.Render
             BuildFloor(ProcArt.FloorTiles(grid, texelsPerCell), apron: 0);
         }
 
+        /// <summary>Builds the whole level's terrain: floor texture, walls laid along their runs, trees, scatter and
+        /// the scenery apron. Called on every <c>level</c> message, so the next level replaces this one.</summary>
         public void BuildLevel(LevelDef level)
         {
             _w = level.Width;
@@ -101,6 +104,7 @@ namespace Crawler.Render
             }
         }
 
+        /// <summary>One scaled mesh under a parent (placeholder art).</summary>
         static void Box(Transform parent, Mesh mesh, Material mat, Vector3 pos, Vector3 scale)
         {
             var go = new GameObject("Box");
@@ -210,6 +214,7 @@ namespace Crawler.Render
             }
         }
 
+        /// <summary>The ground: one textured quad over the map, a plinth under it, and the apron around it.</summary>
         void BuildFloor(Texture2D tex, int apron)
         {
             var floor = new GameObject("Tiles");
@@ -301,6 +306,7 @@ namespace Crawler.Render
         /// </summary>
         static readonly string[] Generated = { "Tiles", "Plinth", "Apron", "Walls", "Trees", "Scatter", "ScenePreview" };
 
+        /// <summary>Removes what this builder made, and nothing else.</summary>
         void Clear()
         {
             for (int i = transform.childCount - 1; i >= 0; i--)
@@ -313,6 +319,7 @@ namespace Crawler.Render
             }
         }
 
+        /// <summary>A new empty child to group generated pieces under.</summary>
         Transform Child(string n)
         {
             var t = new GameObject(n).transform;
@@ -320,6 +327,7 @@ namespace Crawler.Render
             return t;
         }
 
+        /// <summary>One mesh placed under a parent.</summary>
         static GameObject Piece(Transform parent, Mesh mesh, Material mat, Vector3 pos, Quaternion rot)
         {
             var go = new GameObject(mesh.name);
@@ -331,6 +339,7 @@ namespace Crawler.Render
             return go;
         }
 
+        /// <summary>Shows a floor even before the first level arrives.</summary>
         void Start()
         {
             if (transform.Find("Tiles") == null) Build(grid);

@@ -10,16 +10,19 @@ use crate::mechanic::Mechanic;
 use crate::protocol::EntityWire;
 use crate::world::{Kind, World};
 
+/// Ledge states, as sent in the snapshot.
 pub const INTACT: u8 = 0;
 pub const CRACKED: u8 = 1;
 pub const COLLAPSED: u8 = 2;
 
+/// Each ledge's state, by entity id.
 #[derive(Default, Clone)]
 pub struct Ledges {
     state: BTreeMap<usize, u8>,
 }
 
 impl Ledges {
+    /// The ledge in this cell, if any.
     fn at(&self, w: &World, x: i32, y: i32) -> Option<usize> {
         w.ents_at(x, y).find(|(_, e)| e.kind == Kind::Ledge).map(|(id, _)| id)
     }
@@ -34,6 +37,7 @@ impl Mechanic for Ledges {
         Box::new(self.clone())
     }
 
+    /// Every ledge starts intact.
     fn on_load(&mut self, w: &mut World) -> Result<(), String> {
         for (id, e) in w.entities() {
             if e.kind == Kind::Ledge {
@@ -48,6 +52,7 @@ impl Mechanic for Ledges {
         self.at(w, x, y).is_some()
     }
 
+    /// Stepping onto a ledge cracks it; stepping into a collapsed one is a fall.
     fn on_enter(&mut self, w: &mut World, seat: usize, _tick: u32) {
         let (x, y) = w.pos[seat];
         let Some(id) = self.at(w, x, y) else { return };
@@ -60,6 +65,7 @@ impl Mechanic for Ledges {
         }
     }
 
+    /// Stepping off a cracked ledge collapses it, unless the partner is still on it.
     fn on_leave(&mut self, w: &mut World, _seat: usize, from: (i32, i32), _tick: u32) {
         let Some(id) = self.at(w, from.0, from.1) else { return };
         // Still held if the partner stands on it; both stepping off in one tick collapses it once.

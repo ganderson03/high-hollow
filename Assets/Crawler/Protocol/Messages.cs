@@ -3,6 +3,7 @@
 // beside it without touching anything downstream.
 namespace Crawler.Protocol
 {
+    /// <summary>What an entity is. The value is the <c>kind</c> on the wire, shared with the server's <c>Kind</c>.</summary>
     public enum EntityKind : byte
     {
         Player = 0,
@@ -20,8 +21,10 @@ namespace Crawler.Protocol
         Checkpoint = 12, // state 1 = lit
     }
 
+    /// <summary>A held direction; north is +y.</summary>
     public enum MoveDir : byte { None, N, S, E, W }
 
+    /// <summary>One row of a snapshot: where an entity is, what it is, its state, and who carries it.</summary>
     public readonly struct EntityState
     {
         public readonly int X;
@@ -36,6 +39,7 @@ namespace Crawler.Protocol
         }
     }
 
+    /// <summary>The first message from the server: this client's id, the level size and the clock rates.</summary>
     public sealed class Welcome
     {
         public byte ClientId;
@@ -56,6 +60,7 @@ namespace Crawler.Protocol
         public int Active;
     }
 
+    /// <summary>A map cell, x from the west and y from the south.</summary>
     public readonly struct Cell
     {
         public readonly int X;
@@ -74,6 +79,7 @@ namespace Crawler.Protocol
         public string Hash;
     }
 
+    /// <summary>Draw entity <c>Id</c> with another look (a pit dressed as a ledge).</summary>
     public readonly struct Substitution
     {
         public readonly int Id;
@@ -81,6 +87,7 @@ namespace Crawler.Protocol
         public Substitution(int id, int look) { Id = id; Look = look; }
     }
 
+    /// <summary>Draw something that is not there (a false key, a false crevasse).</summary>
     public readonly struct Phantom
     {
         public readonly int X;
@@ -105,12 +112,15 @@ namespace Crawler.Protocol
         };
     }
 
+    /// <summary>A chat line. <c>From</c> is the sender's client id, or 255 for the server.</summary>
     public sealed class ChatMsg
     {
         public byte From;
         public string Text;
     }
 
+    /// <summary>What the player is doing, sent 20 times a second. <c>Tick</c> is the last snapshot tick this
+    /// client saw; the server uses it to drop inputs sent before a restart.</summary>
     public readonly struct InputMsg
     {
         public readonly uint Tick;
@@ -142,6 +152,7 @@ namespace Crawler.Protocol
         public int Seconds;
     }
 
+    /// <summary>Where a restart proposal stands.</summary>
     public enum VoteState : byte { Open, Passed, Lapsed }
 
     /// <summary>A restart proposal: who proposed it, how long it has left, and how it ended.</summary>
@@ -155,5 +166,6 @@ namespace Crawler.Protocol
     /// <summary>The answer to RoundState.Choose.</summary>
     public enum ChoicePick : byte { Both, Quit }
 
+    /// <summary>The connection's state, shown on the status badge.</summary>
     public enum LinkStatus { Idle, Connecting, Connected, Mock, Disconnected, Failed, ProtocolError }
 }

@@ -54,8 +54,11 @@ namespace Crawler.App
         bool _choosing; // the partner did not come back: B takes both leopards, Q leaves
         bool _autostart;
 
+        /// <summary>Startup timing for the player log (play.ps1's speed checks read it).</summary>
         void Awake() => Debug.Log($"[Boot] scene running {Time.realtimeSinceStartup:0.00}s after launch");
 
+        /// <summary>Builds the HUD, wires input and chat to the link, and shows the title card. With -autostart
+        /// (from play.ps1) it connects at once instead of waiting for Enter.</summary>
         void Start()
         {
             ApplyCommandLine();
@@ -131,8 +134,11 @@ namespace Crawler.App
             }
         }
 
+        /// <summary>A poster is up (or was dismissed this very frame, so the Enter that closed it is not also sent).</summary>
         bool PosterBlocking() => _poster.IsShowing || _poster.LastDismissFrame == Time.frameCount;
 
+        /// <summary>Picks the link: the built-in mock (single-player, rules run here) or a real server (rules run
+        /// there). Nothing after this line knows which one it got: both implement <see cref="IServerLink"/>.</summary>
         void StartLink()
         {
             if (_link != null) return;
@@ -159,6 +165,7 @@ namespace Crawler.App
             _link.Start(playerName);
         }
 
+        /// <summary>Once a frame: drain the link into the views, then update room titles and the choice keys.</summary>
         void Update()
         {
             _link?.Pump(this);
@@ -175,6 +182,7 @@ namespace Crawler.App
             else if (kb.qKey.wasPressedThisFrame) { _choosing = false; _link.SendChoice(ChoicePick.Quit); }
         }
 
+        /// <summary>Closes the link with the scene.</summary>
         void OnDestroy()
         {
             _link?.Dispose();
@@ -228,6 +236,7 @@ namespace Crawler.App
 
         // ------------------------------------------------------------------ inbound
 
+        /// <summary>Remembers this client's id, sizes the grid, and matches the input rate to the server's.</summary>
         public void OnWelcome(Welcome m)
         {
             _localClient = m.ClientId;
@@ -238,6 +247,7 @@ namespace Crawler.App
             Debug.Log($"[Link] welcome: client {m.ClientId}, {m.Width}x{m.Height}, {m.TickHz} Hz sim / {m.ReplicationHz} Hz replication");
         }
 
+        /// <summary>Loads the level file the server named and rebuilds the terrain from it.</summary>
         public void OnLevel(LevelMsg m)
         {
             var lvl = LevelStore.Load(m.Id, out var err);
@@ -255,6 +265,8 @@ namespace Crawler.App
             _roomBannerAfter = Time.time + 3.5f;
         }
 
+        /// <summary>Shows the summit card on a win; hides it when a new round starts. Pauses are explained in chat
+        /// by the server; a choice adds the keys to press.</summary>
         public void OnRound(RoundMsg m)
         {
             // The server explains pauses and restarts in chat; the client adds only the keys to press.
@@ -289,6 +301,7 @@ namespace Crawler.App
             }
         }
 
+        /// <summary>Which leopards are ours and which we steer; the rings and the camera follow it.</summary>
         public void OnSeats(SeatsMsg m)
         {
             _seats = m.Yours ?? new int[0];
@@ -297,16 +310,20 @@ namespace Crawler.App
             _region = -1; // re-announce the room the newly steered leopard is in
         }
 
+        /// <summary>Tells the player when the partner wants a restart.</summary>
         public void OnVote(VoteMsg m)
         {
             if (m.State == VoteState.Open && m.By != _localClient)
                 chat.AddSystem("your partner wants to restart the level. press R to agree.");
         }
 
+        /// <summary>Every snapshot replaces the whole picture; the client never simulates.</summary>
         public void OnSnapshot(Snapshot m) => world.ApplySnapshot(m);
 
+        /// <summary>What this player may see; applied when drawing, never fed back into anything.</summary>
         public void OnOverlay(Overlay m) => world.ApplyOverlay(m);
 
+        /// <summary>Adds a chat line, colored by who sent it.</summary>
         public void OnChat(ChatMsg m)
         {
             bool me = m.From == _localClient;
@@ -314,6 +331,7 @@ namespace Crawler.App
             else chat.AddLine(me ? "you" : $"p{m.From}", m.Text, me ? Palette.Ember : Palette.Sand);
         }
 
+        /// <summary>Updates the status badge; failures also go to chat and the log, once each.</summary>
         public void OnStatus(LinkStatus s, string detail)
         {
             if (s == LinkStatus.Mock) detail = $"tick {world.LastTick}";

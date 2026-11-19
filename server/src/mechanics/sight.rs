@@ -11,6 +11,7 @@
 use crate::mechanic::Mechanic;
 use crate::world::{Kind, Perception, World, SEATS};
 
+/// Which crevasses each leopard can see, and the false ones each is shown. Fixed per level.
 #[derive(Default, Clone)]
 pub struct Sight {
     /// Crevasse ids seen only by each seat.
@@ -28,6 +29,7 @@ impl Mechanic for Sight {
         Box::new(self.clone())
     }
 
+    /// Sorts the crevasse glyphs by which leopard sees them.
     fn on_load(&mut self, w: &mut World) -> Result<(), String> {
         for (id, e) in w.entities() {
             match (e.kind, e.glyph) {
@@ -46,6 +48,7 @@ impl Mechanic for Sight {
         Ok(())
     }
 
+    /// A leopard cannot see the crevasses meant for its partner, and sees its own false ones.
     fn perceive(&self, w: &World, seat: usize, p: &mut Perception) {
         let other = 1 - seat;
         p.hidden.extend(self.seen_by[other].iter().filter(|id| !w.filled.contains(id)).map(|&id| id as u32));

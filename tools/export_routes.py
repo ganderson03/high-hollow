@@ -20,6 +20,7 @@ OUT = os.environ.get("HH_ROUTES") or os.path.join(ROOT, "server", "tests", "rout
 
 
 def main(ids):
+    """Solves each level and writes its route; a level with errors or no win is skipped and said so."""
     if not ids:
         trail = json.load(open(os.path.join(LEVELS, "trail.json"), encoding="utf-8"))
         ids = [l for b in trail["biomes"] for l in b["levels"]]
