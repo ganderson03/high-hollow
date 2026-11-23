@@ -27,11 +27,14 @@ namespace Crawler.Protocol
         public List<LevelRegion> Regions = new List<LevelRegion>();
         public List<LevelLink> Links = new List<LevelLink>();
 
+        /// <summary>The glyph at a cell; anything off the map reads as wall, so edges need no special case.</summary>
         public char At(int x, int y) =>
             x >= 0 && y >= 0 && x < Width && y < Height ? Tiles[x, y] : '#';
 
+        /// <summary>Whether the cell is on the map.</summary>
         public bool InBounds(int x, int y) => x >= 0 && y >= 0 && x < Width && y < Height;
 
+        /// <summary>Walls and trees block everything; every other glyph stands on floor.</summary>
         public static bool IsSolidTile(char c) => c == '#' || c == 'T';
 
         /// <summary>Index of the first region containing the cell, or -1.</summary>
@@ -55,6 +58,7 @@ namespace Crawler.Protocol
         }
     }
 
+    /// <summary>A named room: its title card, and the rule its doors follow.</summary>
     public sealed class LevelRegion
     {
         public string Name;
@@ -62,6 +66,7 @@ namespace Crawler.Protocol
         public string Rule; // hub | lever | plate | sight | goal
         public int X, Y, W, H; // cells; (X, Y) is the south-west corner
 
+        /// <summary>Whether the cell is inside this room.</summary>
         public bool Contains(int x, int y) => x >= X && y >= Y && x < X + W && y < Y + H;
     }
 
@@ -76,8 +81,11 @@ namespace Crawler.Protocol
         public LevelLink(int fx, int fy, int tx, int ty) { FromX = fx; FromY = fy; ToX = tx; ToY = ty; }
     }
 
+    /// <summary>Reads level files. The Rust server's <c>Level::parse</c> reads them the same way.</summary>
     public static class LevelCodec
     {
+        /// <summary>Parses and checks a level file. Rows are listed north to south, so row 0 becomes y = height - 1.
+        /// Throws FormatException on anything inconsistent rather than guessing.</summary>
         public static LevelDef Parse(string json)
         {
             var o = JObject.Parse(json);

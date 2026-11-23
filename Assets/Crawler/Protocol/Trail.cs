@@ -42,17 +42,21 @@ namespace Crawler.Protocol
         }
     }
 
+    /// <summary>One biome of the trail and its levels, in order.</summary>
     public sealed class TrailBiome
     {
         public string Id;
         public string Name;
         public readonly List<string> Levels = new List<string>();
 
+        /// <summary>The last level of a biome is its finale.</summary>
         public bool IsFinale(int index) => index == Levels.Count - 1;
     }
 
+    /// <summary>Reads levels/trail.json.</summary>
     public static class TrailCodec
     {
+        /// <summary>Parses the trail manifest; throws FormatException if it has no biomes.</summary>
         public static TrailDef Parse(string json)
         {
             var o = JObject.Parse(json);

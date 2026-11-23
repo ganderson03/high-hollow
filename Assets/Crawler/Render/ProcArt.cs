@@ -89,6 +89,7 @@ namespace Crawler.Render
             return new Material(Lit);
         }
 
+        /// <summary>One of Unity's built-in meshes, borrowed once and cached.</summary>
         public static Mesh Mesh(PrimitiveType type)
         {
             if (_meshes.TryGetValue(type, out var m) && m != null) return m;
@@ -112,6 +113,7 @@ namespace Crawler.Render
             return mat;
         }
 
+        /// <summary>A material that gives off its own light (the summit marker, the ring under the steered leopard).</summary>
         public static Material Glow(Color c, float intensity)
         {
             var mat = NewLit(true);
@@ -124,6 +126,7 @@ namespace Crawler.Render
             return mat;
         }
 
+        /// <summary>A lit material with a generated texture.</summary>
         public static Material Textured(Texture2D tex, Color tint)
         {
             var mat = NewLit(false);
@@ -264,8 +267,10 @@ namespace Crawler.Render
             return tex;
         }
 
+        /// <summary>A square floor texture.</summary>
         static Texture2D NewFloorTexture(int n, string name) => NewFloorTexture(n, n, name);
 
+        /// <summary>An empty texture set up for floors: clamped at the edges, smoothly filtered.</summary>
         static Texture2D NewFloorTexture(int w, int h, string name) =>
             new Texture2D(w, h, TextureFormat.RGBA32, true)
                 { name = name, wrapMode = TextureWrapMode.Clamp, filterMode = FilterMode.Bilinear, anisoLevel = 4 };
@@ -330,6 +335,7 @@ namespace Crawler.Render
             return tex;
         }
 
+        /// <summary>The poster sky's color bands, from sienna at the horizon to cream at the top.</summary>
         static Color SkyBand(float v)
         {
             if (v > 0.86f) return Palette.Cream;
@@ -339,17 +345,20 @@ namespace Crawler.Render
             return Palette.Sienna;
         }
 
+        /// <summary>A mountain ridge's height along the horizon: two sine waves layered.</summary>
         static float Ridge(float u, float baseline, float amp, float freq, float phase) =>
             baseline
             + amp * 0.6f * Mathf.Sin(u * freq * 6.2832f + phase)
             + amp * 0.4f * Mathf.Sin(u * freq * 2.3f * 6.2832f + phase * 1.7f);
 
+        /// <summary>A single smooth peak, for the tall mountain.</summary>
         static float Peak(float u, float center, float width)
         {
             float p = Mathf.Max(0f, 1f - Mathf.Abs(u - center) / width);
             return p * p * (3f - 2f * p);
         }
 
+        /// <summary>Whether a point is inside one of the pine silhouettes along the foreground.</summary>
         static bool InPine(float u, float v)
         {
             const int count = 16;
@@ -367,6 +376,7 @@ namespace Crawler.Render
             return false;
         }
 
+        /// <summary>The fractional part of a number.</summary>
         static float Frac(float x) => x - Mathf.Floor(x);
     }
 }

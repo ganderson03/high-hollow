@@ -24,17 +24,22 @@ namespace Crawler.Render
 
         int _w = 32, _h = 32;
 
+        /// <summary>A plain square floor, used before any level is known.</summary>
         public void Build(int size)
         {
             _w = _h = grid = size;
+            WorldMap.Set(null);
             Clear();
             BuildFloor(ProcArt.FloorTiles(grid, texelsPerCell), apron: 0);
         }
 
+        /// <summary>Builds the whole level's terrain: floor texture, walls laid along their runs, trees, scatter and
+        /// the scenery apron. Called on every <c>level</c> message, so the next level replaces this one.</summary>
         public void BuildLevel(LevelDef level)
         {
             _w = level.Width;
             _h = level.Height;
+            WorldMap.Set(level); // doors ask it which way their wall runs
             Clear();
             BuildFloor(ProcArt.LevelFloor(level, texelsPerCell), apronCells);
 
@@ -73,7 +78,7 @@ namespace Crawler.Render
             for (int x = 0; x < _w; x++)
             {
                 char t = level.At(x, y);
-                if (t == '#') DryStone(walls, x, y, stone, lichen, WallAxis(level, x, y));
+                if (t == '#') DryStone(walls, x, y, stone, lichen, WorldMap.AxisAt(level, x, y));
                 else if (t == 'T') { if (ProcArt.Hash01(x, y, 3) < treeDensity) Pine(trees, x, y, needles, bark, snow); }
                 else if (t == '.') Scatter(scatter, x, y, stone, tuft, level.RegionAt(x, y) >= 0);
                 // Cells holding an entity (pits, doors, keys) get no scatter: a pebble sitting
@@ -99,6 +104,7 @@ namespace Crawler.Render
             }
         }
 
+        /// <summary>One scaled mesh under a parent (placeholder art).</summary>
         static void Box(Transform parent, Mesh mesh, Material mat, Vector3 pos, Vector3 scale)
         {
             var go = new GameObject("Box");
@@ -107,16 +113,6 @@ namespace Crawler.Render
             go.transform.localScale = scale;
             go.AddComponent<MeshFilter>().sharedMesh = mesh;
             go.AddComponent<MeshRenderer>().sharedMaterial = mat;
-        }
-
-        /// <summary>Which way this run of wall travels, so the stones can be laid along it.</summary>
-        static float WallAxis(LevelDef level, int x, int y)
-        {
-            bool ew = level.At(x - 1, y) == '#' || level.At(x + 1, y) == '#';
-            bool ns = level.At(x, y - 1) == '#' || level.At(x, y + 1) == '#';
-            if (ew && !ns) return 0f;
-            if (ns && !ew) return 90f;
-            return ProcArt.Hash01(x, y, 99) < 0.5f ? 0f : 90f; // corner or pillar: either reads fine
         }
 
         /// <summary>
@@ -218,6 +214,7 @@ namespace Crawler.Render
             }
         }
 
+        /// <summary>The ground: one textured quad over the map, a plinth under it, and the apron around it.</summary>
         void BuildFloor(Texture2D tex, int apron)
         {
             var floor = new GameObject("Tiles");
@@ -309,11 +306,20 @@ namespace Crawler.Render
         /// </summary>
         static readonly string[] Generated = { "Tiles", "Plinth", "Apron", "Walls", "Trees", "Scatter", "ScenePreview" };
 
+        /// <summary>
+        /// Hand-placed set dressing belongs under a child with this name. Nothing generates it
+        /// and nothing clears it, so whatever is parked there survives into a play session.
+        /// Never add this to <see cref="Generated"/>.
+        /// </summary>
+        public const string HandmadeRoot = "Handmade";
+
+        /// <summary>Removes what this builder made, and nothing else.</summary>
         void Clear()
         {
             for (int i = transform.childCount - 1; i >= 0; i--)
             {
                 var go = transform.GetChild(i).gameObject;
+                if (go.name == HandmadeRoot) continue; // hand-placed work is never ours to delete
                 if (System.Array.IndexOf(Generated, go.name) < 0) continue;
                 // Immediate on purpose: a rebuild recreates these same names right away, and a
                 // deferred Destroy would leave the old copy standing for the rest of the frame.
@@ -321,6 +327,7 @@ namespace Crawler.Render
             }
         }
 
+        /// <summary>A new empty child to group generated pieces under.</summary>
         Transform Child(string n)
         {
             var t = new GameObject(n).transform;
@@ -328,6 +335,7 @@ namespace Crawler.Render
             return t;
         }
 
+        /// <summary>One mesh placed under a parent.</summary>
         static GameObject Piece(Transform parent, Mesh mesh, Material mat, Vector3 pos, Quaternion rot)
         {
             var go = new GameObject(mesh.name);
@@ -339,6 +347,7 @@ namespace Crawler.Render
             return go;
         }
 
+        /// <summary>Shows a floor even before the first level arrives.</summary>
         void Start()
         {
             if (transform.Find("Tiles") == null) Build(grid);

@@ -23,12 +23,18 @@ namespace Crawler.Input
         /// <summary>Tab: switch to the other leopard, when this client holds both.</summary>
         public Action OnSwitch;
 
+        /// <summary>R: propose restarting the level, or agree to the partner's proposal.</summary>
+        public Action OnVote;
+
         float _accum;
         bool _interactLatched;
         MoveDir _lastPressed = MoveDir.None;
 
+        /// <summary>Matches the send rate to the server's snapshot rate (from welcome).</summary>
         public void SetReplicationHz(int hz) => replicationHz = Mathf.Max(1, hz);
 
+        /// <summary>Every frame: catch key presses (so none are missed between sends). Once per replication interval:
+        /// send one input with the held direction and any latched interact.</summary>
         void Update()
         {
             var kb = Keyboard.current;
@@ -38,6 +44,7 @@ namespace Crawler.Input
             {
                 if (kb.spaceKey.wasPressedThisFrame) _interactLatched = true;
                 if (kb.tabKey.wasPressedThisFrame) { _lastPressed = MoveDir.None; OnSwitch?.Invoke(); }
+                if (kb.rKey.wasPressedThisFrame) OnVote?.Invoke();
                 if (Pressed(kb.wKey, kb.upArrowKey)) _lastPressed = MoveDir.N;
                 if (Pressed(kb.sKey, kb.downArrowKey)) _lastPressed = MoveDir.S;
                 if (Pressed(kb.dKey, kb.rightArrowKey)) _lastPressed = MoveDir.E;
@@ -57,6 +64,7 @@ namespace Crawler.Input
             if (logInputs) Debug.Log("[Input] " + WireCodec.EncodeInput(msg));
         }
 
+        /// <summary>The held direction: the last one pressed while it is still held, else any held one.</summary>
         MoveDir CurrentMove(Keyboard kb)
         {
             if (Held(_lastPressed, kb)) return _lastPressed;
@@ -65,6 +73,7 @@ namespace Crawler.Input
             return MoveDir.None;
         }
 
+        /// <summary>WASD or the arrow keys.</summary>
         static bool Held(MoveDir d, Keyboard kb)
         {
             switch (d)

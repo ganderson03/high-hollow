@@ -15,8 +15,11 @@ namespace Crawler.Mock
         readonly List<Phantom> _falseKeys = new List<Phantom>();
         readonly Dictionary<int, List<int>> _doorLinks = new Dictionary<int, List<int>>(); // door id -> source ids
         int _totalKeys;
-        bool _revealed, _gateAnnounced;
+        // per seat: the sightstone that leopard is looking through (-1 for none); cleared when it steps off
+        readonly int[] _seeing = { -1, -1 };
+        bool _gateAnnounced;
 
+        /// <summary>Counts keys, collects hidden pits and false keys, and resolves links to entity ids.</summary>
         public void OnLoad(MockWorld w)
         {
             var byCell = new Dictionary<(int, int), int>();
@@ -44,12 +47,15 @@ namespace Crawler.Mock
             }
         }
 
+        /// <summary>Levers off, the sightstone unused. Doors and plates are derived, so need no reset.</summary>
         public void Reset(MockWorld w)
         {
             _leversOn.Clear();
-            _revealed = _gateAnnounced = false;
+            _seeing[0] = _seeing[1] = -1;
+            _gateAnnounced = false;
         }
 
+        /// <summary>Only a closed door blocks.</summary>
         public bool Blocks(MockWorld w, int x, int y)
         {
             for (int id = w.FirstEntity; id < w.Ents.Count; id++)
@@ -60,9 +66,17 @@ namespace Crawler.Mock
             return false;
         }
 
+        /// <summary>A leopard stepped into a cell: a pit sends it back to its room's entrance, a key is picked up,
+        /// and the summit is checked. The Rust server's <c>core.rs</c> is a port of this.</summary>
         public void OnEnter(MockWorld w, int seat, uint tick)
         {
             var (x, y) = w.Pos[seat];
+            // Any step ends a sightstone's sight: the leopard has stepped off it.
+            if (_seeing[seat] >= 0)
+            {
+                _seeing[seat] = -1;
+                w.PerceptionChanged = true;
+            }
             for (int id = w.FirstEntity; id < w.Ents.Count; id++)
             {
                 var e = w.Ents[id];
@@ -71,7 +85,7 @@ namespace Crawler.Mock
                 switch (e.Kind)
                 {
                     case EntityKind.Hazard:
-                        w.Say(e.Glyph == 'h' && !_revealed
+                        w.Say(e.Glyph == 'h'
                             ? "something unseen bites. back to the room's entrance. (a sightstone might help.)"
                             : "a fall. back to the room's entrance.");
                         w.MinorFailure(seat, x, y);
@@ -127,6 +141,8 @@ namespace Crawler.Mock
             }
         }
 
+        /// <summary>Pulls the first lever beside the leopard (diagonals count), or looks through the sightstone it is
+        /// standing on, for as long as it stays there.</summary>
         public bool OnInteract(MockWorld w, int seat, uint tick)
         {
             var (px, py) = w.Pos[seat];
@@ -141,16 +157,18 @@ namespace Crawler.Mock
                     w.Say(on ? "*clunk*. stone grinds open nearby." : "*clunk*. a door slides shut.");
                     return true;
                 }
-                if (e.Kind == EntityKind.Sightstone && !_revealed)
+                // A sightstone works only underfoot, and reveals only its own room.
+                if (e.Kind == EntityKind.Sightstone && e.X == px && e.Y == py && _seeing[seat] < 0)
                 {
-                    _revealed = true;
-                    w.Say("the sightstone hums. hidden pits show their teeth, and any false key fades.");
+                    _seeing[seat] = id;
+                    w.Say("the sightstone hums. while you stand on it, this room's hidden pits show their teeth and any false key fades.");
                     return true;
                 }
             }
             return false;
         }
 
+        /// <summary>Each core piece's state for the snapshot; a carried key is drawn at its carrier's cell.</summary>
         public void Write(MockWorld w, EntityState[] arr)
         {
             for (int id = w.FirstEntity; id < w.Ents.Count; id++)
@@ -173,22 +191,29 @@ namespace Crawler.Mock
                     case EntityKind.Goal:
                         arr[id] = new EntityState(e.X, e.Y, e.Kind, (byte)(w.Won ? 1 : 0), -1); break;
                     case EntityKind.Sightstone:
-                        arr[id] = new EntityState(e.X, e.Y, e.Kind, (byte)(_revealed ? 1 : 0), -1); break;
+                        arr[id] = new EntityState(e.X, e.Y, e.Kind, (byte)(_seeing[0] == id || _seeing[1] == id ? 1 : 0), -1); break;
                     case EntityKind.Hazard:
                         arr[id] = new EntityState(e.X, e.Y, e.Kind, 0, -1); break;
                 }
             }
         }
 
+        /// <summary>Unless this leopard is standing on a room's sightstone and looking through it, that room's hidden
+        /// pits are missing and its false keys appear.</summary>
         public void Perceive(MockWorld w, int seat, OverlayBuilder overlay)
         {
-            if (_revealed) return;
-            overlay.Hidden.AddRange(_hiddenPits);
-            overlay.Phantoms.AddRange(_falseKeys);
+            int s = _seeing[seat];
+            int seen = s >= 0 && w.Pos[seat] == (w.Ents[s].X, w.Ents[s].Y) ? w.Ents[s].Region : int.MinValue;
+            foreach (int id in _hiddenPits)
+                if (w.Ents[id].Region != seen) overlay.Hidden.Add(id);
+            foreach (var k in _falseKeys)
+                if (w.Level.RegionAt(k.X, k.Y) != seen) overlay.Phantoms.Add(k);
         }
 
         // ------------------------------------------------------------------ rules
 
+        /// <summary>The summit gate opens with every key carried; a linked door with any of its sources; any other
+        /// door with its region's plate (plate rooms) or lever (everywhere else).</summary>
         bool DoorOpen(MockWorld w, int id)
         {
             var door = w.Ents[id];
@@ -221,6 +246,7 @@ namespace Crawler.Mock
             return false;
         }
 
+        /// <summary>A lever that is on, or a plate with a leopard standing on it.</summary>
         bool SourceActive(MockWorld w, int id)
         {
             var e = w.Ents[id];
@@ -229,6 +255,7 @@ namespace Crawler.Mock
 
         static int CarriedCount(MockWorld w) => w.Carried.Count;
 
+        /// <summary>Small numbers as words, for chat.</summary>
         static string Number(int n) => n == 2 ? "two" : n == 3 ? "three" : n == 4 ? "four" : n.ToString();
     }
 }

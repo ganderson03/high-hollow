@@ -7,22 +7,22 @@
   "rows": [
     "TTTTTTTTTTTTTTTTTTTTTTTT",
     "T######################T",
-    "T#.....#.#L#####.#....#T",
+    "T#.....#.#B#####.#....#T",
     "T#....L#.....D...#....#T",
     "T#.P...D.#######....G.#T",
     "T#.1...#.....D...#....#T",
-    "T#.....#.#L#####.#....#T",
+    "T#.....#.#######L#....#T",
     "T######################T",
     "TTTTTTTTTTTTTTTTTTTTTTTT"
   ],
   "regions": [
     {"name": "The Trailhead", "subtitle": "Space beside a lever pulls it", "rect": [2, 2, 5, 5], "rule": "lever"},
-    {"name": "Split Lanes", "subtitle": "each lane's lever opens the other lane  ·  Tab switches leopard", "rect": [8, 2, 9, 5], "rule": "lever"},
+    {"name": "Split Lanes", "subtitle": "one stands on the plate, the other opens the way back  ·  Tab switches leopard", "rect": [8, 2, 9, 5], "rule": "lever"},
     {"name": "Summit Rise", "subtitle": "both leopards to the summit", "rect": [18, 2, 4, 5], "rule": "goal"}
   ],
   "links": [
     {"from": [6, 3], "to": [7, 4]},
     {"from": [10, 2], "to": [13, 5]},
-    {"from": [10, 6], "to": [13, 3]}
+    {"from": [16, 6], "to": [13, 3]}
   ]
 }

@@ -11,6 +11,8 @@ namespace Crawler.App
     {
         static readonly Regex SafeId = new Regex("^[a-z0-9_-]{1,32}$");
 
+        /// <summary>Loads one level. Null (with an error) if the id is not whitelisted, or the file is missing or
+        /// malformed.</summary>
         public static LevelDef Load(string id, out string error)
         {
             error = null;

@@ -30,6 +30,7 @@ namespace Crawler.Render
         /// </summary>
         public static void ClearCache() => _cache.Clear();
 
+        /// <summary>Builds a mesh once per key and reuses it.</summary>
         static Mesh Cached(string key, System.Func<Mesh> make)
         {
             if (_cache.TryGetValue(key, out var m) && m != null) return m;
@@ -122,6 +123,7 @@ namespace Crawler.Render
                 });
             });
 
+        /// <summary>A point on a torus: angle <c>a</c> around the ring, angle <c>t</c> around the tube.</summary>
         static Vector3 RingPt(float a, float t, float radius, float tube)
         {
             float r = radius + Mathf.Cos(t) * tube;
@@ -170,6 +172,8 @@ namespace Crawler.Render
             return p;
         }
 
+        /// <summary>A repeatable pseudo-random number in [0, 1] from three integers, so shapes are the same
+        /// every run.</summary>
         static float Hash(int a, int b, int c)
         {
             unchecked
@@ -186,6 +190,7 @@ namespace Crawler.Render
             readonly List<Vector3> _v = new List<Vector3>();
             readonly List<int> _t = new List<int>();
 
+            /// <summary>One triangle with its own three vertices.</summary>
             public void Tri(Vector3 a, Vector3 b, Vector3 c)
             {
                 int i = _v.Count;
@@ -193,12 +198,14 @@ namespace Crawler.Render
                 _t.Add(i); _t.Add(i + 1); _t.Add(i + 2);
             }
 
+            /// <summary>A four-cornered face as two triangles.</summary>
             public void Quad(Vector3 a, Vector3 b, Vector3 c, Vector3 d)
             {
                 Tri(a, b, c);
                 Tri(a, c, d);
             }
 
+            /// <summary>Closes a ring of points with triangles meeting at a centre (a cap).</summary>
             public void Fan(Vector3[] ring, Vector3 centre, bool reverse)
             {
                 for (int i = 0; i < ring.Length; i++)
@@ -230,6 +237,7 @@ namespace Crawler.Render
                 return m;
             }
 
+            /// <summary>Flips any triangle whose normal points into the solid.</summary>
             void OrientOutward(System.Func<Vector3, Vector3> interiorAt)
             {
                 var centroid = Vector3.zero;
