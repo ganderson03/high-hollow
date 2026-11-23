@@ -115,3 +115,7 @@ InitTestScene*.unity*
 
 # Rust server build output
 /server/target/
+
+# Python bytecode from tools/
+__pycache__/
+*.pyc

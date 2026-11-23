@@ -26,11 +26,11 @@ def main(ids):
         ids = [l for b in trail["biomes"] for l in b["levels"]]
     os.makedirs(OUT, exist_ok=True)
     for lid in ids:
-        d, w, h, errs, duo, states = levelcheck.analyse(os.path.join(LEVELS, lid + ".json"), max_states=levelcheck.MAX_STATES)
+        d, w, h, errs, duo, states, _solo = levelcheck.analyse(os.path.join(LEVELS, lid + ".json"), max_states=levelcheck.MAX_STATES)
         if errs or duo is None:
             print(f"{lid}: skipped ({'; '.join(errs) or 'unsolved'})")
             continue
-        _, _, actions = duo
+        _, _, actions, _ = duo
         with open(os.path.join(OUT, lid + ".json"), "w", encoding="utf-8", newline="\n") as f:
             f.write("[\n" + ",\n".join(f'  [{s}, "{a}"]' for s, a in actions) + "\n]\n")
         print(f"{lid}: {len(actions)} actions ({states} states)")

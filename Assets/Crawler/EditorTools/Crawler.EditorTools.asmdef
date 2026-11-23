@@ -2,6 +2,7 @@
     "name": "Crawler.EditorTools",
     "rootNamespace": "Crawler.EditorTools",
     "references": [
+        "Crawler.App",
         "Crawler.Protocol",
         "Crawler.Render"
     ],

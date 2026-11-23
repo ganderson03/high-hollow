@@ -173,7 +173,10 @@ def analyse(path, max_states=MAX_STATES):
                     return True
         return False
 
-    def solve(seats):
+    def won_solo(npos, s):
+        return any(npos[s] == (g[2], g[3]) for g in goals)
+
+    def solve(seats, win=None):
         # Breadth-first search over (leopard 0's cell, leopard 1's cell, levers, keys). Breadth
         # first means the first win found is a shortest one. Each state remembers the state and
         # action it came from, so the route can be read back from the win.
@@ -214,7 +217,7 @@ def analyse(path, max_states=MAX_STATES):
                             nc[key_idx[i]] = s
                     nst = (npos[0], npos[1], lv, tuple(nc))
                     step = {(1, 0): "e", (-1, 0): "w", (0, 1): "n", (0, -1): "s"}[(dx, dy)]
-                    if won(npos):
+                    if win(npos, s) if win else won(npos):
                         # walk back through prev to recover the route, then count hand-offs
                         actions = [(s, step)]
                         cur = st
@@ -222,8 +225,14 @@ def analyse(path, max_states=MAX_STATES):
                             cur, who, act = prev[cur]
                             actions.append((who, act))
                         actions.reverse()
+                        # The cells both leopards stood in at each step, for drawing the route.
+                        path, cur = [(npos[0], npos[1])], st
+                        while cur is not None:
+                            path.append((cur[0], cur[1]))
+                            cur = prev[cur][0] if prev[cur] is not None else None
+                        path.reverse()
                         switches = sum(1 for a, b in zip(actions, actions[1:]) if a[0] != b[0])
-                        return (len(actions), switches, actions), len(prev)
+                        return (len(actions), switches, actions, path), len(prev)
                     if nst not in prev:
                         prev[nst] = (st, s, step)
                         q.append(nst)
@@ -232,12 +241,15 @@ def analyse(path, max_states=MAX_STATES):
         return None, len(prev)
 
     duo, duo_states = solve((0, 1))
-    return d, w, h, errs, duo, duo_states
+    # Can one leopard do the whole level's work on its own? If it can, nothing in the
+    # level forces cooperation, whatever the hand-off count on the two-leopard route says.
+    solo = [solve((s,), won_solo)[0] for s in (0, 1)]
+    return d, w, h, errs, duo, duo_states, solo
 
 
 if __name__ == "__main__":
     for path in sys.argv[1:]:
-        d, w, h, errs, duo, states = analyse(path)
+        d, w, h, errs, duo, states, solo = analyse(path)
         print(f"== {d['id']} '{d['name']}' {w}x{h}")
         for e in dict.fromkeys(errs):
             print("  ERROR", e)
@@ -247,6 +259,12 @@ if __name__ == "__main__":
             else:
                 print(f"  UNSOLVABLE (searched all {states} states)")
         else:
-            actions, switches, _ = duo
+            actions, switches = duo[0], duo[1]
             print(f"  solvable: shortest {actions} actions (~{actions * 0.15:.0f}s of pure input), {states} states searched")
             print(f"  control passes between leopards {switches} times on that route")
+        for s, r in enumerate(solo):
+            if r is not None:
+                print(f"  NOT COOPERATIVE: leopard {s} alone reaches the summit in {r[0]} actions, "
+                      f"doing every lever and key itself; the partner only has to arrive")
+        if duo is not None and all(r is None for r in solo):
+            print("  cooperative: neither leopard can finish the level by itself")
